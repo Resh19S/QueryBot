@@ -37,7 +37,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
     setQuestionsError('');
     
     try {
-      const url = new URL('http://localhost:8000/sample-questions');
+      const url = new URL('https://querybot-production.up.railway.app/sample-questions');
       if (apiKey) {
         url.searchParams.append('api_key', apiKey);
       }
