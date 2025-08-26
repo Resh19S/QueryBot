@@ -8,7 +8,6 @@ numpy
 plotly
 # FastAPI Backend Requirements
 pandas
-sqlite3  
 requests
 python-multipart
 pydantic
