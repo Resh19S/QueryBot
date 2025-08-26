@@ -147,9 +147,17 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (query.trim() && !isLoading && isFileUploaded) {
+                    handleSubmit(e);
+                  }
+                }
+              }}
               placeholder={
                 isFileUploaded 
-                  ? `Ask anything about your ${getDataTypeDisplay(dataContext).toLowerCase()}... (e.g., try the sample questions below)` 
+                  ? `Ask anything about your ${getDataTypeDisplay(dataContext).toLowerCase()}... (e.g., try the sample questions below).` 
                   : "Upload a CSV file first to start querying your data..."
               }
               className={`w-full px-6 py-4 pr-16 text-lg border-2 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${
