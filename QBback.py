@@ -11,12 +11,16 @@ import uvicorn
 import logging
 import os
 import re
+from dotenv import load_dotenv  # Add this import
+
+# Load environment variables from .env file
+load_dotenv()  # Add this line
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Supply Chain Analytics API", version="1.0.0")
+app = FastAPI(title="Data Analytics API", version="1.0.0")
 
 # Add CORS middleware to allow requests from React app
 app.add_middleware(
@@ -30,7 +34,7 @@ app.add_middleware(
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     query: str
-    table_name: str = "supply_chain_data"
+    table_name: str = "Data"
     api_key: Optional[str] = None
 
 class QueryResponse(BaseModel):
@@ -59,8 +63,14 @@ class SampleQuestionsResponse(BaseModel):
 current_dataframe: Optional[pd.DataFrame] = None
 current_connection: Optional[sqlite3.Connection] = None
 
-# Default API key
+# Default API key - now properly loaded from .env file
 DEFAULT_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Add debug logging to verify the API key is loaded
+if DEFAULT_API_KEY:
+    logger.info(f"API key loaded successfully: {DEFAULT_API_KEY[:10]}...")
+else:
+    logger.warning("No GEMINI_API_KEY found in environment variables")
 
 # Gemini Client Class
 class GeminiClient:
