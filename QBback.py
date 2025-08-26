@@ -25,7 +25,7 @@ app = FastAPI(title="Data Analytics API", version="1.0.0")
 # Add CORS middleware to allow requests from React app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=["https://querybot-three.vercel.app"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
