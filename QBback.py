@@ -226,8 +226,8 @@ def generate_contextual_sample_questions(df, data_context, api_key=None):
                 else:
                     clean_row[k] = str(v)[:50]
             clean_sample.append(clean_row)
-        
-        system_prompt = """You are an expert data analyst. Generate 6 relevant sample questions that users would typically ask about their dataset.
+
+        system_prompt = """You are an expert data analyst. Generate 6 relevant sample questions that should relate to the dataset provided and that users would typically ask about their dataset.
 Rules:
 1. Return EXACTLY 6 questions, one per line
 2. Questions should be natural language, not technical

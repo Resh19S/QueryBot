@@ -131,40 +131,9 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
   return (
     <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {!isFileUploaded && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8 p-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg"
-          >
-            <Upload className="mx-auto mb-3 text-yellow-600 dark:text-yellow-400" size={32} />
-            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-2">
-              Upload Data First
-            </h3>
-            <p className="text-yellow-700 dark:text-yellow-400">
-              Please upload a CSV file using the settings panel before asking questions about your data.
-            </p>
-          </motion.div>
-        )}
+        
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-center mb-12"
-        >
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Ask Questions About Your Data
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-300 mb-2">
-            Use natural language to query your data and get instant insights
-          </p>
-          {dataContext && (
-            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-               Detected: {getDataTypeDisplay(dataContext)}
-            </p>
-          )}
-        </motion.div>
+        
 
         {/* Main Query Form */}
         <motion.form
