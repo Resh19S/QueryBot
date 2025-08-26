@@ -13,4 +13,4 @@ requests
 python-multipart
 pydantic
 # Optional: For better development experience
-python-json-logger==2.0.7
+python-json-logger
