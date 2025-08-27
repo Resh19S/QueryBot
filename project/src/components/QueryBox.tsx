@@ -158,7 +158,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
               placeholder={
                 isFileUploaded 
                   ? `Ask anything about your ${getDataTypeDisplay(dataContext).toLowerCase()}... (e.g., try the sample questions below).` 
-                  : "Upload a CSV file first to start querying your data..."
+                  : "Upload a CSV file first in Settings to start querying your data..."
               }
               className={`w-full px-6 py-4 pr-16 text-lg border-2 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${
                 isFileUploaded
