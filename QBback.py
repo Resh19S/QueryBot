@@ -44,6 +44,7 @@ class QueryResponse(BaseModel):
     question: str
     sql_query: Optional[str] = None
     message: Optional[str] = None
+    ai_summary: Optional[str] = None  # Add AI summary field
 
 class GeminiSettings(BaseModel):
     model: str = "gemini-1.5-flash"
@@ -172,6 +173,102 @@ class GeminiClient:
 
 # Initialize Gemini client
 gemini_client = GeminiClient()
+
+def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
+    """Generate AI-powered analytical summary of query results"""
+    
+    client_to_use = gemini_client
+    if api_key:
+        client_to_use = GeminiClient(api_key=api_key)
+    
+    if not client_to_use.test_connection():
+        logger.info("Gemini not available for summary generation")
+        return None
+    
+    try:
+        # Prepare data sample for analysis (limit to avoid token limits)
+        data_sample = query_results[:10] if len(query_results) > 10 else query_results
+        
+        # Extract key insights from the data
+        total_records = len(query_results)
+        columns = list(query_results[0].keys()) if query_results else []
+        
+        # Identify numeric columns and calculate basic stats
+        numeric_insights = []
+        categorical_insights = []
+        
+        if query_results:
+            for col in columns:
+                values = [row.get(col) for row in query_results if row.get(col) is not None]
+                
+                # Check if column is numeric
+                try:
+                    numeric_values = [float(v) for v in values if str(v).replace('.', '').replace('-', '').isdigit()]
+                    if len(numeric_values) > 0:
+                        numeric_insights.append({
+                            'column': col,
+                            'min': min(numeric_values),
+                            'max': max(numeric_values),
+                            'avg': sum(numeric_values) / len(numeric_values),
+                            'count': len(numeric_values)
+                        })
+                except:
+                    # Handle categorical data
+                    if len(values) > 0:
+                        unique_values = list(set([str(v) for v in values]))
+                        if len(unique_values) <= 10:  # Only for manageable categories
+                            categorical_insights.append({
+                                'column': col,
+                                'unique_count': len(unique_values),
+                                'top_values': unique_values[:5]
+                            })
+        
+        system_prompt = """You are an expert data analyst. Generate a concise, insightful summary of query results.
+Focus on:
+1. Key patterns and trends in the data
+2. Notable findings or outliers
+3. Business implications
+4. Clear, actionable insights
+
+Rules:
+- Write in a professional, analytical tone
+- Keep it concise (2-4 sentences)
+- Focus on what the data reveals, not just counts
+- Use specific numbers and insights
+- Make it valuable for business decision-making"""
+
+        prompt = f"""Analyze these query results and provide an insightful summary:
+
+User Question: "{user_question}"
+SQL Query: {sql_query}
+Total Records: {total_records}
+Columns: {', '.join(columns)}
+
+Numeric Insights: {numeric_insights}
+Categorical Insights: {categorical_insights}
+
+Sample Data (first few records): {data_sample}
+
+Generate an analytical summary focusing on key insights and patterns:"""
+
+        summary = client_to_use.generate_response(prompt, system_prompt)
+        
+        if summary:
+            # Clean up the summary
+            summary = summary.strip()
+            # Remove any unwanted prefixes
+            if summary.lower().startswith(('summary:', 'analysis:', 'insight:')):
+                summary = summary.split(':', 1)[1].strip()
+            
+            logger.info("Generated AI summary successfully")
+            return summary
+        else:
+            logger.warning("AI summary generation failed")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error generating AI summary: {str(e)}")
+        return None
 
 def detect_data_type_and_context(df):
     """Analyze the dataframe to detect what type of data it is"""
@@ -579,145 +676,27 @@ async def process_query(request: QueryRequest):
         
         data, columns = execute_query(current_connection, sql_query)
         
+        # Generate AI-powered summary
+        ai_summary = None
+        if data:  # Only generate summary if there are results
+            ai_summary = generate_ai_summary(
+                request.query,
+                data,
+                sql_query,
+                request.api_key
+            )
+        
         return QueryResponse(
             success=True,
             data=data,
             columns=columns,
             question=request.query,
             sql_query=sql_query,
-            message=f"Query executed successfully. Found {len(data)} results."
+            message=f"Query executed successfully. Found {len(data)} results.",
+            ai_summary=ai_summary
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error processing query: {str(e)}")
-        return QueryResponse(
-            success=False,
-            data=[],
-            columns=[],
-            question=request.query,
-            message=f"Error processing query: {str(e)}"
-        )
-
-@app.get("/gemini/status")
-async def gemini_status():
-    """Check Gemini API connection status"""
-    is_connected = gemini_client.test_connection()
-    models = gemini_client.get_available_models()
-    
-    return {
-        "connected": is_connected,
-        "current_model": gemini_client.model,
-        "available_models": models,
-        "api_key_configured": bool(gemini_client.api_key and gemini_client.api_key != "YOUR_DEFAULT_API_KEY_HERE")
-    }
-
-@app.post("/gemini/settings")
-async def update_gemini_settings(settings: GeminiSettings):
-    """Update Gemini settings"""
-    global gemini_client
-    
-    if settings.api_key:
-        gemini_client.update_api_key(settings.api_key)
-    
-    gemini_client.model = settings.model
-    gemini_client.temperature = settings.temperature
-    gemini_client.top_p = settings.top_p
-    
-    gemini_client._configure_client()
-    
-    is_connected = gemini_client.test_connection()
-    
-    return {
-        "success": True,
-        "connected": is_connected,
-        "message": f"Settings updated. Model: {settings.model}, API Key configured: {bool(settings.api_key)}"
-    }
-
-@app.post("/gemini/test-api-key")
-async def test_api_key(request: ApiKeyRequest):
-    """Test if provided API key works"""
-    try:
-        test_client = GeminiClient(api_key=request.api_key)
-        is_working = test_client.test_connection()
-        
-        if is_working:
-            available_models = test_client.get_available_models()
-            return {
-                "success": True,
-                "message": "API key is valid and working",
-                "available_models": available_models
-            }
-        else:
-            return {
-                "success": False,
-                "message": "API key test failed. Please check your key."
-            }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"API key test failed: {str(e)}"
-        }
-
-@app.get("/data/overview")
-async def data_overview():
-    """Get overview of current dataset"""
-    if current_dataframe is None:
-        raise HTTPException(status_code=400, detail="No data uploaded")
-    
-    df = current_dataframe.copy()
-    
-    def safe_value_counts(series):
-        """Get value counts and convert to JSON-safe format"""
-        counts = series.value_counts()
-        return {str(k): int(v) for k, v in counts.head(10).items()}
-    
-    data_context, confidence, column_names = detect_data_type_and_context(df)
-    
-    overview = {
-        "total_records": len(df),
-        "columns": len(df.columns),
-        "column_names": list(df.columns),
-        "data_types": {k: str(v) for k, v in df.dtypes.to_dict().items()},
-        "missing_values": {k: int(v) for k, v in df.isnull().sum().to_dict().items()},
-        "sample_data": df.head(5).fillna("N/A").to_dict('records'),
-        "detected_context": data_context,
-        "context_confidence": confidence
-    }
-    
-    categorical_cols = []
-    for col in df.columns:
-        if df[col].dtype == 'object' and df[col].nunique() < len(df) * 0.5:
-            categorical_cols.append(col)
-    
-    if categorical_cols:
-        overview[f"{categorical_cols[0].lower()}_distribution"] = safe_value_counts(df[categorical_cols[0]])
-    
-    return overview
-
-@app.get("/test-query")
-async def test_query():
-    """Test endpoint to verify basic functionality"""
-    if current_dataframe is None or current_connection is None:
-        return {"error": "No data uploaded"}
-    
-    try:
-        cursor = current_connection.cursor()
-        cursor.execute("SELECT COUNT(*) FROM supply_chain_data")
-        result = cursor.fetchone()
-        
-        return {
-            "success": True,
-            "message": f"Database connection working. Total rows: {result[0]}",
-            "columns": list(current_dataframe.columns),
-            "gemini_status": gemini_client.test_connection()
-        }
-    except Exception as e:
-        return {"error": f"Database test failed: {str(e)}"}
-
-if __name__ == "__main__":
-    uvicorn.run("backend:app", host="0.0.0.0", port=8000, reload=True)
-
-#.\querybot_env\Scripts\Activate.ps1
-#uvicorn QBback:app --reload --host 0.0.0.0 --port 8000
+        logger

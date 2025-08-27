@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Table, FileText, Send, BarChart3 } from 'lucide-react';
+import { Table, FileText, Send, BarChart3, Download } from 'lucide-react';
 import { DataTable } from './DataTable';
 import { PieChartComponent } from './charts/PieChart';
 import { BarChartComponent } from './charts/BarChart';
@@ -44,9 +44,35 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     );
   }
 
-  const visualizationOptions = [
-    { type: 'table' as const, icon: Table, label: 'Table View' }
-  ];
+  const downloadCSV = () => {
+    if (!result.data.length) return;
+    
+    // Convert data to CSV format
+    const headers = result.columns.join(',');
+    const csvContent = result.data.map(row => 
+      result.columns.map(col => {
+        const value = row[col];
+        // Handle values that contain commas or quotes
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    ).join('\n');
+    
+    const csv = `${headers}\n${csvContent}`;
+    
+    // Create and download the file
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'query_results.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const getChartKeys = () => {
     if (!result.data.length) return { x: '', y: '' };
@@ -70,6 +96,12 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const generateTextSummary = () => {
     if (!result.data.length) return "No data found for this query.";
     
+    // Use the AI-generated summary from the backend if available
+    if (result.ai_summary) {
+      return result.ai_summary;
+    }
+    
+    // Fallback to basic summary if AI summary is not available
     const rowCount = result.data.length;
     const colCount = result.columns.length;
     
@@ -144,27 +176,21 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
             )}
 
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Query Results
-              </h3>
-                          
-              <div className="flex flex-wrap gap-2">
-                {visualizationOptions.map((option) => (
-                  <motion.button
-                    key={option.type}
-                    onClick={() => setVisualizationType(option.type)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      visualizationType === option.type
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <option.icon className="w-4 h-4" />
-                    <span>{option.label}</span>
-                  </motion.button>
-                ))}
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Query Results
+                </h3>
+                
+                {/* Download Button */}
+                <motion.button
+                  onClick={downloadCSV}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download CSV</span>
+                </motion.button>
               </div>
             </div>
 
