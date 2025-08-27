@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Table, BarChart3, PieChart, TrendingUp, FileText } from 'lucide-react';
+import { Table, FileText, Send, BarChart3 } from 'lucide-react';
 import { DataTable } from './DataTable';
 import { PieChartComponent } from './charts/PieChart';
 import { BarChartComponent } from './charts/BarChart';
@@ -17,10 +17,14 @@ interface AnswerDisplayProps {
   } | null;
 }
 
-type VisualizationType = 'table' | 'pie' | 'bar' | 'line' | 'text';
+type VisualizationType = 'table' | 'text';
+type ChartType = 'pie' | 'bar' | 'line' | null;
 
 export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const [visualizationType, setVisualizationType] = useState<VisualizationType>('table');
+  const [chartRequest, setChartRequest] = useState('');
+  const [showChart, setShowChart] = useState<ChartType>(null);
+  const [chartProcessing, setChartProcessing] = useState(false);
 
   if (!result) return null;
 
@@ -41,11 +45,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   }
 
   const visualizationOptions = [
-    { type: 'table' as const, icon: Table, label: 'Table View' },
-    { type: 'bar' as const, icon: BarChart3, label: 'Bar Chart' },
-    { type: 'pie' as const, icon: PieChart, label: 'Pie Chart' },
-    { type: 'line' as const, icon: TrendingUp, label: 'Line Chart' },
-    { type: 'text' as const, icon: FileText, label: 'Text Summary' }
+    { type: 'table' as const, icon: Table, label: 'Table View' }
   ];
 
   const getChartKeys = () => {
@@ -80,42 +80,96 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     }`;
   };
 
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="py-16 bg-gray-50 dark:bg-gray-800"
-    >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Query Results
-            </h3>
-                        
-            <div className="flex flex-wrap gap-2">
-              {visualizationOptions.map((option) => (
-                <motion.button
-                  key={option.type}
-                  onClick={() => setVisualizationType(option.type)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    visualizationType === option.type
-                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <option.icon className="w-4 h-4" />
-                  <span>{option.label}</span>
-                </motion.button>
-              ))}
-            </div>
-          </div>
+  const handleChartRequest = async () => {
+    if (!chartRequest.trim()) return;
+    
+    setChartProcessing(true);
+    
+    // Simple keyword matching for chart types
+    const request = chartRequest.toLowerCase();
+    let chartType: ChartType = null;
+    
+    if (request.includes('pie') || request.includes('donut') || request.includes('circle')) {
+      chartType = 'pie';
+    } else if (request.includes('bar') || request.includes('column') || request.includes('histogram')) {
+      chartType = 'bar';
+    } else if (request.includes('line') || request.includes('trend') || request.includes('time') || request.includes('over time')) {
+      chartType = 'line';
+    } else {
+      // Default to bar chart for numeric data requests
+      chartType = 'bar';
+    }
+    
+    // Simulate processing delay
+    setTimeout(() => {
+      setShowChart(chartType);
+      setChartProcessing(false);
+    }, 1000);
+  };
 
-          <div className="p-6">
-            <AnimatePresence mode="wait">
-              {visualizationType === 'table' && (
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChartRequest();
+    }
+  };
+
+  return (
+    <div className="py-16 bg-gray-50 dark:bg-gray-800">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        {/* Main Query Results */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* SQL Query Section */}
+            {result.sql_query && (
+              <div className="px-6 pt-6">
+                <details className="group">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                    View Generated SQL Query
+                  </summary>
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    className="mt-3 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
+                  >
+                    <code className="text-sm text-gray-700 dark:text-gray-300 font-mono">
+                      {result.sql_query}
+                    </code>
+                  </motion.div>
+                </details>
+              </div>
+            )}
+
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Query Results
+              </h3>
+                          
+              <div className="flex flex-wrap gap-2">
+                {visualizationOptions.map((option) => (
+                  <motion.button
+                    key={option.type}
+                    onClick={() => setVisualizationType(option.type)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      visualizationType === option.type
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <option.icon className="w-4 h-4" />
+                    <span>{option.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6">
+              <AnimatePresence mode="wait">
                 <motion.div
                   key="table"
                   initial={{ opacity: 0, x: -20 }}
@@ -124,82 +178,112 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
                 >
                   <DataTable data={result.data} columns={result.columns} />
                 </motion.div>
-              )}
-
-              {visualizationType === 'pie' && (
-                <motion.div
-                  key="pie"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                >
-                  <PieChartComponent data={result.data} dataKey={yKey} nameKey={xKey} />
-                </motion.div>
-              )}
-
-              {visualizationType === 'bar' && (
-                <motion.div
-                  key="bar"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                >
-                  <BarChartComponent data={result.data} xAxisKey={xKey} yAxisKey={yKey} />
-                </motion.div>
-              )}
-
-              {visualizationType === 'line' && (
-                <motion.div
-                  key="line"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                >
-                  <LineChartComponent data={result.data} xAxisKey={xKey} yAxisKey={yKey} />
-                </motion.div>
-              )}
-
-              {visualizationType === 'text' && (
-                <motion.div
-                  key="text"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="prose dark:prose-invert max-w-none"
-                >
-                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                      Summary
-                    </h4>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {generateTextSummary()}
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {result.sql_query && (
-            <div className="px-6 pb-6">
-              <details className="group">
-                <summary className="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-                  View Generated SQL Query
-                </summary>
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  className="mt-3 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden"
-                >
-                  <code className="text-sm text-gray-700 dark:text-gray-300 font-mono">
-                    {result.sql_query}
-                  </code>
-                </motion.div>
-              </details>
+              </AnimatePresence>
             </div>
-          )}
-        </div>
+          </div>
+        </motion.section>
+
+        {/* Text Summary Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <FileText className="mr-2" size={20} />
+                Data Summary
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Summary
+                </h4>
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {generateTextSummary()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Chart Request Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <BarChart3 className="mr-2" size={20} />
+                Request Chart Visualization
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Describe what type of chart you'd like to see (e.g., "show me a pie chart", "create a bar graph", "line chart over time")
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={chartRequest}
+                  onChange={(e) => setChartRequest(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="What kind of chart would you like to see?"
+                  className="flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-colors"
+                />
+                <motion.button
+                  onClick={handleChartRequest}
+                  disabled={!chartRequest.trim() || chartProcessing}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-600 hover:to-amber-700 transition-all duration-200 flex items-center space-x-2"
+                >
+                  {chartProcessing ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send size={16} />
+                  )}
+                  <span>{chartProcessing ? 'Creating...' : 'Create Chart'}</span>
+                </motion.button>
+              </div>
+
+              {/* Chart Display */}
+              <AnimatePresence>
+                {showChart && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -20, height: 0 }}
+                    className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700"
+                  >
+                    <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
+                      Generated Chart
+                    </h4>
+                    
+                    {showChart === 'pie' && (
+                      <PieChartComponent data={result.data} dataKey={yKey} nameKey={xKey} />
+                    )}
+
+                    {showChart === 'bar' && (
+                      <BarChartComponent data={result.data} xAxisKey={xKey} yAxisKey={yKey} />
+                    )}
+
+                    {showChart === 'line' && (
+                      <LineChartComponent data={result.data} xAxisKey={xKey} yAxisKey={yKey} />
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.section>
       </div>
-    </motion.section>
+    </div>
   );
 }

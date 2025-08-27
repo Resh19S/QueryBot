@@ -227,15 +227,16 @@ def generate_contextual_sample_questions(df, data_context, api_key=None):
                     clean_row[k] = str(v)[:50]
             clean_sample.append(clean_row)
 
-        system_prompt = """You are an expert data analyst. Generate 6 relevant sample questions that should relate to the dataset provided and that users would typically ask about their dataset.
+        system_prompt = """You are an expert data analyst. Generate 4 relevant sample questions that should relate to the dataset provided and that users would typically ask about their dataset.
 Rules:
-1. Return EXACTLY 6 questions, one per line
-2. Questions should be natural language, not technical
-3. Base questions on the actual column names and data patterns
-4. Make questions practical and business-relevant
-5. Use the exact column names from the data
-6. Don't use quotation marks around the questions
-7. Each question should be different and explore different aspects of the data"""
+1. Return EXACTLY 4 questions, one per line
+2. make sure the questions generated are all answerable 
+3. Questions should be natural language, not technical
+4. Base questions on the actual column names and data patterns
+5. Make questions practical and business-relevant
+6. Use the exact column names from the data
+7. Don't use quotation marks around the questions
+8. Each question should be different and explore different aspects of the data"""
         
         prompt = f"""Dataset Analysis:
 Data Context: {data_context}
@@ -243,7 +244,7 @@ Columns: {', '.join(columns)}
 Sample Data (first 2 rows): {clean_sample}
 Total Rows: {len(df)}
 
-Based on this {data_context} dataset, generate 6 sample questions that would be relevant for analysis.
+Based on this {data_context} dataset, generate 4 sample questions that would be relevant for analysis.
 Focus on insights that would be valuable for business decision-making.
 
 Generate questions now:"""

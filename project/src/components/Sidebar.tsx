@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Database, Settings, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Upload, Database, Settings } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -20,7 +20,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   dataOverview 
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDataInfoExpanded, setIsDataInfoExpanded] = useState(true);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -31,10 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
-  };
-
-  const toggleDataInfo = () => {
-    setIsDataInfoExpanded(!isDataInfoExpanded);
   };
 
   return (
@@ -104,9 +99,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* Upload Status */}
                 {uploadStatus && (
                   <div className={`mt-3 p-3 rounded-lg text-sm ${
-                    uploadStatus.includes('âœ…') 
+                    uploadStatus.includes('✅') 
                       ? 'bg-green-50 text-green-800 border border-green-200' 
-                      : uploadStatus.includes('âŒ') 
+                      : uploadStatus.includes('❌') 
                       ? 'bg-red-50 text-red-800 border border-red-200'
                       : 'bg-blue-50 text-blue-800 border border-blue-200'
                   }`}>
@@ -114,103 +109,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Data Information Dropdown */}
-              {isFileUploaded && dataOverview && (
-                <div>
-                  <button
-                    onClick={toggleDataInfo}
-                    className="w-full flex items-center justify-between text-lg font-semibold text-gray-900 dark:text-white mb-4 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                  >
-                    <div className="flex items-center">
-                      <FileText className="mr-2" size={18} />
-                      Data Information
-                    </div>
-                    {isDataInfoExpanded ? (
-                      <ChevronUp size={18} />
-                    ) : (
-                      <ChevronDown size={18} />
-                    )}
-                  </button>
-                  
-                  <AnimatePresence>
-                    {isDataInfoExpanded && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="space-y-3"
-                      >
-                        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            Records: {dataOverview.total_records?.toLocaleString()}
-                          </div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            Columns: {dataOverview.columns}
-                          </div>
-                        </div>
-
-                        {dataOverview.column_names && (
-                          <div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Available Columns:
-                            </div>
-                            <div className="space-y-1 max-h-32 overflow-y-auto">
-                              {dataOverview.column_names.map((column: string, index: number) => (
-                                <div
-                                  key={index}
-                                  className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded"
-                                >
-                                  {column}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {dataOverview.top_suppliers && (
-                          <div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Top Suppliers:
-                            </div>
-                            <div className="space-y-1">
-                              {Object.entries(dataOverview.top_suppliers).slice(0, 5).map(([supplier, count], index) => (
-                                <div
-                                  key={index}
-                                  className="text-xs flex justify-between px-2 py-1 bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-200 rounded"
-                                >
-                                  <span>{supplier}</span>
-                                  <span>{count as number}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {dataOverview.order_status_distribution && (
-                          <div>
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Order Status:
-                            </div>
-                            <div className="space-y-1">
-                              {Object.entries(dataOverview.order_status_distribution).map(([status, count], index) => (
-                                <div
-                                  key={index}
-                                  className="text-xs flex justify-between px-2 py-1 bg-purple-50 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded"
-                                >
-                                  <span>{status}</span>
-                                  <span>{count as number}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
 
               {/* API Configuration */}
               <div>
