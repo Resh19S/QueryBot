@@ -15,27 +15,7 @@ export function Hero() {
             transition={{ duration: 0.8 }}
             className="space-y-6"
           >
-            <motion.h1 
-              className="text-4xl md:text-4xl font-bold tracking-tight"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.1 }}
-            >
-              <span className="text-gray-900 dark:text-white">Intelligent </span>
-              <span className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 bg-clip-text text-transparent">
-                Data
-              </span>
-              <span className="text-gray-900 dark:text-white"> Analytics</span>
-            </motion.h1>
-
-            <motion.p 
-              className="text-xl md:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-            >
-              Converse with complex datasets in simple natural language
-            </motion.p>
+            
           </motion.div>
 
         </div>

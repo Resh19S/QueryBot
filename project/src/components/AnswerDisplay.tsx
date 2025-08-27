@@ -96,12 +96,6 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const generateTextSummary = () => {
     if (!result.data.length) return "No data found for this query.";
     
-    // Use the AI-generated summary from the backend if available
-    if (result.ai_summary) {
-      return result.ai_summary;
-    }
-    
-    // Fallback to basic summary if AI summary is not available
     const rowCount = result.data.length;
     const colCount = result.columns.length;
     
@@ -216,20 +210,24 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
           transition={{ delay: 0.2 }}
         >
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                <FileText className="mr-2" size={20} />
-                Data Summary
-              </h3>
-            </div>
-
             <div className="p-6">
-              <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
-  
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                  {generateTextSummary()}
-                </p>
-              </div>
+              <details className="group">
+                <summary className="cursor-pointer text-lg font-semibold text-gray-900 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 transition-colors flex items-center">
+                  <FileText className="mr-2" size={20} />
+                  Data Summary
+                </summary>
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  className="mt-4 overflow-hidden"
+                >
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
+                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {generateTextSummary()}
+                    </p>
+                  </div>
+                </motion.div>
+              </details>
             </div>
           </div>
         </motion.section>
@@ -244,10 +242,10 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 <BarChart3 className="mr-2" size={20} />
-                Request Chart Visualization
+                Data Visualization
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Describe what type of chart you'd like to see (e.g., "show me a pie chart", "create a bar graph", "line chart over time")
+                what type of chart you'd like to see (e.g., "show me a pie chart")
               </p>
             </div>
 
