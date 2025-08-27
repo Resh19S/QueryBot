@@ -12,7 +12,7 @@ interface SidebarProps {
 }
 
 // --- The access key is now hardcoded directly here ---
-const CORRECT_ACCESS_KEY = "your-secret-password-here"; // <-- CHANGE THIS LINE
+const CORRECT_ACCESS_KEY = "pass@123"; // <-- CHANGE THIS LINE
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   isOpen, 
