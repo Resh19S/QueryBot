@@ -16,6 +16,26 @@ export function PieChartComponent({ data, dataKey, nameKey }: PieChartComponentP
     value: typeof item[dataKey] === 'number' ? item[dataKey] : 1
   }));
 
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{
+          backgroundColor: 'white',
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          color: 'black',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        }}>
+          <p style={{ margin: 0, fontWeight: 'bold' }}>
+            {payload[0].name}: {payload[0].value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -37,14 +57,7 @@ export function PieChartComponent({ data, dataKey, nameKey }: PieChartComponentP
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              border: 'none',
-              borderRadius: '8px',
-              color: 'white'
-            }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Legend />
         </PieChart>
       </ResponsiveContainer>
