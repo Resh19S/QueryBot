@@ -173,114 +173,6 @@ class GeminiClient:
 # Initialize Gemini client
 gemini_client = GeminiClient()
 
-def generate_analytical_summary(query, data, columns, sql_query, client_to_use):
-    """Generate AI-powered analytical summary using Gemini"""
-    
-    if not client_to_use or not client_to_use.test_connection() or not data:
-        logger.info("Falling back to basic summary - Gemini not available")
-        return generate_fallback_summary(query, data, columns)
-    
-    try:
-        # Prepare data sample for analysis
-        sample_size = min(5, len(data))
-        sample_data = data[:sample_size]
-        
-        # Calculate basic statistics for numeric columns
-        stats_info = ""
-        if data:
-            first_row = data[0]
-            numeric_columns = [col for col in columns if isinstance(first_row.get(col), (int, float))]
-            
-            if numeric_columns:
-                for col in numeric_columns[:2]:  # Limit to first 2 numeric columns
-                    values = [row[col] for row in data if row.get(col) is not None]
-                    if values:
-                        stats_info += f"\n{col}: min={min(values)}, max={max(values)}, avg={sum(values)/len(values):.2f}"
-        
-        # Create the analysis prompt
-        system_prompt = """You are a data analyst providing insights to business users. Your role is to:
-1. Explain what the query revealed in plain, conversational language
-2. Highlight key insights and patterns in the data
-3. Provide business context when relevant
-4. Keep the tone professional but approachable
-5. Focus on actionable insights rather than technical details
-
-Guidelines:
-- Write 2-4 sentences maximum
-- Use natural, conversational language
-- Avoid technical jargon
-- Focus on what the results mean for the user
-- If the data shows trends or patterns, mention them
-- If there are surprising findings, highlight them"""
-
-        prompt = f"""Analyze this query result and provide a business-focused summary:
-
-User's Question: "{query}"
-SQL Query Generated: {sql_query}
-
-Results Overview:
-- Total Records Found: {len(data)}
-- Columns: {', '.join(columns)}
-- Sample Data (first {sample_size} records): {json.dumps(sample_data, default=str, indent=2)}
-
-{f"Key Statistics:{stats_info}" if stats_info else ""}
-
-Provide a conversational, insightful summary that explains what this query revealed and why it matters to the user. Focus on the business implications and key takeaways."""
-
-        logger.info("Generating AI-powered analytical summary")
-        summary = client_to_use.generate_response(prompt, system_prompt)
-        
-        if summary and len(summary.strip()) > 20:
-            logger.info("AI summary generated successfully")
-            return summary.strip()
-        else:
-            logger.warning("AI summary was too short or empty, using fallback")
-            return generate_fallback_summary(query, data, columns)
-            
-    except Exception as e:
-        logger.error(f"Error generating AI analytical summary: {e}")
-        return generate_fallback_summary(query, data, columns)
-
-def generate_fallback_summary(query, data, columns):
-    """Generate a basic summary when AI is not available"""
-    if not data:
-        return "No data found for your query. This could mean the conditions you specified didn't match any records in the dataset."
-    
-    row_count = len(data)
-    col_count = len(columns)
-    
-    # Basic analysis based on query keywords
-    query_lower = query.lower()
-    
-    if any(word in query_lower for word in ['highest', 'maximum', 'max', 'top']):
-        return f"Your query found the {row_count} record{'s' if row_count != 1 else ''} with the highest values based on your criteria. These represent the top performers in your dataset."
-    
-    elif any(word in query_lower for word in ['lowest', 'minimum', 'min', 'bottom']):
-        return f"Your query identified the {row_count} record{'s' if row_count != 1 else ''} with the lowest values. These show the bottom end of your data distribution."
-    
-    elif any(word in query_lower for word in ['average', 'avg', 'mean']):
-        return f"Your query calculated average values across the dataset. This gives you a central tendency measure to understand typical values in your data."
-    
-    elif any(word in query_lower for word in ['count', 'total', 'how many']):
-        if row_count == 1 and data[0]:
-            # Likely a count/aggregate result
-            count_field = next((k for k, v in data[0].items() if isinstance(v, (int, float))), None)
-            if count_field:
-                return f"Your count query shows {data[0][count_field]} total records matching your criteria."
-        return f"Your query returned {row_count} records that match your counting criteria."
-    
-    else:
-        # Generic summary
-        if row_count == 1:
-            return f"Your query found exactly one record that matches your criteria, providing specific details about that entry."
-        elif row_count <= 10:
-            return f"Your query retrieved {row_count} records that match your criteria, showing {col_count} fields of data for each result."
-        else:
-            return f"Your query returned {row_count} records from your dataset. This comprehensive result set includes {col_count} data fields per record, giving you a detailed view of the requested information."
-
-# Keep all existing functions (detect_data_type_and_context, generate_contextual_sample_questions, etc.)
-# ... [All the existing functions remain the same] ...
-
 def detect_data_type_and_context(df):
     """Analyze the dataframe to detect what type of data it is"""
     columns = [col.lower() for col in df.columns]
@@ -678,10 +570,6 @@ async def process_query(request: QueryRequest):
         
         metadata = get_table_metadata(current_connection, request.table_name)
         
-        client_to_use = gemini_client
-        if request.api_key:
-            client_to_use = GeminiClient(api_key=request.api_key)
-
         sql_query = generate_sql_query_gemini(
             request.query, 
             metadata, 
@@ -690,14 +578,6 @@ async def process_query(request: QueryRequest):
         )
         
         data, columns = execute_query(current_connection, sql_query)
-
-        analytical_summary = generate_analytical_summary(
-            request.query, 
-            data, 
-            columns, 
-            sql_query, 
-            client_to_use
-        )
         
         return QueryResponse(
             success=True,
