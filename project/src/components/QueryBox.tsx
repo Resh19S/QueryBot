@@ -213,6 +213,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
         stopListening();
       }
       onSubmit(query.trim());
+      setQuery('');
     }
   };
 
