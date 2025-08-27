@@ -184,7 +184,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
           </div>
           
           {/* Character count and status */}
-          <div className="flex justify-between items-center mt-3 px-2">
+          <div className="flex justify-between items-center mt-2 px-2">
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {query.length}/500 characters
             </div>
@@ -203,7 +203,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="mt-6 relative"
+            className="mt-3 relative"
             ref={dropdownRef}
           >
             <motion.button
@@ -253,7 +253,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-10 overflow-hidden"
+                  className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-10 overflow-hidden"
                 >
                   <div className="py-2">
                     {questionsError && (
@@ -311,7 +311,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center mt-8"
+            className="text-center mt-5"
           >
             <div className="inline-flex items-center px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <Loader2 className="animate-spin mr-3 text-blue-600 dark:text-blue-400" size={20} />
