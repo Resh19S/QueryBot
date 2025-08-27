@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Table, FileText, Send, BarChart3, Download } from 'lucide-react';
+import { Table, FileText, Send, BarChart3, Download, ChevronDown } from 'lucide-react';
 import { DataTable } from './DataTable';
 import { PieChartComponent } from './charts/PieChart';
 import { BarChartComponent } from './charts/BarChart';
@@ -14,6 +14,7 @@ interface AnswerDisplayProps {
     question: string;
     sql_query?: string;
     message?: string;
+    ai_summary?: string;
   } | null;
 }
 
@@ -25,6 +26,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const [chartRequest, setChartRequest] = useState('');
   const [showChart, setShowChart] = useState<ChartType>(null);
   const [chartProcessing, setChartProcessing] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
 
   if (!result) return null;
 
@@ -209,7 +211,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
           </div>
         </motion.section>
 
-        {/* Text Summary Section */}
+        {/* Text Summary Section - Updated with smooth expand/collapse */}
         <motion.section
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -217,23 +219,46 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
         >
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6">
-              <details className="group">
-                <summary className="cursor-pointer text-lg font-semibold text-gray-900 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 transition-colors flex items-center">
+              <motion.button
+                onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                className="w-full flex items-center justify-between text-left cursor-pointer text-lg font-semibold text-gray-900 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 transition-colors group"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <div className="flex items-center">
                   <FileText className="mr-2" size={20} />
                   Data Summary
-                </summary>
+                </div>
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  className="mt-4 overflow-hidden"
+                  animate={{ rotate: isSummaryExpanded ? 180 : 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="text-gray-400 group-hover:text-amber-500 transition-colors"
                 >
-                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {generateTextSummary()}
-                    </p>
-                  </div>
+                  <ChevronDown size={20} />
                 </motion.div>
-              </details>
+              </motion.button>
+              
+              <AnimatePresence>
+                {isSummaryExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      ease: "easeInOut",
+                      opacity: { duration: 0.2 }
+                    }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {generateTextSummary()}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.section>

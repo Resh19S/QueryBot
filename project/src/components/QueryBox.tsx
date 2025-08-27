@@ -219,11 +219,6 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
                   <span className="text-gray-700 dark:text-gray-300 font-medium">
                     Sample Questions
                   </span>
-                  {dataContext && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Generated for your {getDataTypeDisplay(dataContext).toLowerCase()}
-                    </p>
-                  )}
                 </div>
                 {isLoadingQuestions && (
                   <Loader2 className="ml-2 animate-spin text-blue-500" size={16} />
