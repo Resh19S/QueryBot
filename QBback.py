@@ -435,7 +435,7 @@ def generate_pattern_based_questions(df, data_context, columns):
     
     return questions[:6]
 
-def load_csv_to_sqlite(df, table_name="Data"):
+def load_csv_to_sqlite(df, table_name="supply_chain_data"):
     """Convert CSV to SQLite table"""
     try:
         conn = sqlite3.connect(':memory:')
@@ -592,7 +592,7 @@ def execute_query(conn, sql_query):
 
 @app.get("/")
 async def root():
-    return {"message": "Data API with Gemini", "status": "running"}
+    return {"message": "supply_chain_data, API with Gemini", "status": "running"}
 
 @app.post("/upload-csv")
 async def upload_csv(file: UploadFile = File(...)):
