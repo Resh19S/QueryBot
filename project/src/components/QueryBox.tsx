@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Loader2, Upload, ChevronDown, Lightbulb, RefreshCw } from 'lucide-react';
+import { Send, Loader2, Upload, ChevronDown, Lightbulb, RefreshCw, Mic, MicOff } from 'lucide-react';
 
 interface QueryBoxProps {
   onSubmit: (query: string) => void;
@@ -27,7 +27,135 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
   const [dataContext, setDataContext] = useState<string>('');
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [questionsError, setQuestionsError] = useState<string>('');
+  
+  // Voice recognition states
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string>('');
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Check for voice recognition support
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setIsVoiceSupported(true);
+    }
+  }, []);
+
+  // Initialize speech recognition
+  const initSpeechRecognition = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      setVoiceError('Speech recognition not supported in this browser');
+      return null;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setVoiceError('');
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      // Update query with final transcript, keep interim for real-time feedback
+      if (finalTranscript) {
+        setQuery(prev => prev + (prev ? ' ' : '') + finalTranscript.trim());
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      
+      switch (event.error) {
+        case 'no-speech':
+          setVoiceError('No speech detected. Please try again.');
+          break;
+        case 'audio-capture':
+          setVoiceError('Microphone not accessible. Please check permissions.');
+          break;
+        case 'not-allowed':
+          setVoiceError('Microphone access denied. Please enable microphone permissions.');
+          break;
+        case 'network':
+          setVoiceError('Network error occurred. Please check your connection.');
+          break;
+        default:
+          setVoiceError('Voice recognition failed. Please try again.');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    return recognition;
+  }, []);
+
+  // Start voice recognition
+  const startListening = () => {
+    if (!isVoiceSupported) {
+      setVoiceError('Voice recognition not supported in this browser');
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      recognitionRef.current = initSpeechRecognition();
+    }
+
+    if (recognitionRef.current && !isListening) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        setVoiceError('Failed to start voice recognition');
+      }
+    }
+  };
+
+  // Stop voice recognition
+  const stopListening = () => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  // Toggle voice recognition
+  const toggleVoiceRecognition = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   // Fetch sample questions when file is uploaded
   const fetchSampleQuestions = useCallback(async () => {
@@ -80,6 +208,10 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim() && !isLoading) {
+      // Stop listening if currently active
+      if (isListening) {
+        stopListening();
+      }
       onSubmit(query.trim());
     }
   };
@@ -131,10 +263,6 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
   return (
     <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-
-        
-
         {/* Main Query Form */}
         <motion.form
           initial={{ opacity: 0, y: 20 }}
@@ -157,10 +285,10 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
               }}
               placeholder={
                 isFileUploaded 
-                  ? `Ask anything about your Data... (e.g., try the sample questions below).` 
+                  ? `Ask anything about your data... (e.g., try the sample questions below or use voice input).` 
                   : "Upload a CSV file first in Settings to start querying your data..."
               }
-              className={`w-full px-6 py-4 pr-16 text-lg border-2 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${
+              className={`w-full px-6 py-4 pr-32 text-lg border-2 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${
                 isFileUploaded
                   ? 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white'
                   : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 cursor-not-allowed'
@@ -168,6 +296,31 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
               rows={3}
               disabled={!isFileUploaded || isLoading}
             />
+            
+            {/* Voice Recognition Button */}
+            {isVoiceSupported && isFileUploaded && (
+              <motion.button
+                type="button"
+                onClick={toggleVoiceRecognition}
+                disabled={isLoading}
+                className={`absolute bottom-4 right-20 p-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed ${
+                  isListening
+                    ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                    : 'bg-gray-500 hover:bg-gray-600 text-white disabled:bg-gray-300'
+                }`}
+                whileHover={{ scale: !isLoading ? 1.05 : 1 }}
+                whileTap={{ scale: !isLoading ? 0.95 : 1 }}
+                title={isListening ? "Stop listening" : "Start voice input"}
+              >
+                {isListening ? (
+                  <MicOff size={24} />
+                ) : (
+                  <Mic size={24} />
+                )}
+              </motion.button>
+            )}
+
+            {/* Submit Button */}
             <motion.button
               type="submit"
               disabled={!query.trim() || isLoading || !isFileUploaded}
@@ -183,17 +336,32 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
             </motion.button>
           </div>
           
-          {/* Character count and status */}
+          {/* Character count, status, and voice feedback */}
           <div className="flex justify-between items-center mt-2 px-2">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {query.length}/500 characters
-            </div>
-            {isFileUploaded && (
-              <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                Data Ready
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {query.length}/500 characters
               </div>
-            )}
+              {isListening && (
+                <div className="flex items-center text-sm text-red-600 dark:text-red-400">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                  Listening...
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-4">
+              {voiceError && (
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  {voiceError}
+                </div>
+              )}
+              {isFileUploaded && (
+                <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  Data Ready
+                </div>
+              )}
+            </div>
           </div>
         </motion.form>
 
