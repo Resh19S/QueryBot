@@ -96,6 +96,12 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const generateTextSummary = () => {
     if (!result.data.length) return "No data found for this query.";
     
+    // Use the AI-generated summary from the backend if available
+    if (result.ai_summary) {
+      return result.ai_summary;
+    }
+    
+    // Fallback to basic summary if AI summary is not available
     const rowCount = result.data.length;
     const colCount = result.columns.length;
     
