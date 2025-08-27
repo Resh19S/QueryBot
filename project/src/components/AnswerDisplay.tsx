@@ -199,9 +199,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
 
             <div className="p-6">
               <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-amber-200 dark:border-gray-600">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                  Summary
-                </h4>
+  
                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                   {generateTextSummary()}
                 </p>
