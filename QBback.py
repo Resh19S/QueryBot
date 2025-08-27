@@ -469,38 +469,6 @@ def get_table_metadata(conn, table_name):
         logger.error(f"Error getting metadata: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting metadata: {str(e)}")
 
-def generate_pattern_based_sql(user_question, table_name, columns):
-    """Generate SQL using pattern matching as fallback"""
-    question_lower = user_question.lower()
-    
-    if "highest" in question_lower and "quantity" in question_lower:
-        if "Quantity" in columns:
-            return f"SELECT * FROM {table_name} ORDER BY Quantity DESC LIMIT 1"
-    elif "lowest" in question_lower and "price" in question_lower:
-        price_col = next((col for col in columns if "price" in col.lower()), None)
-        if price_col:
-            return f"SELECT * FROM {table_name} ORDER BY `{price_col}` ASC LIMIT 1"
-    elif "count" in question_lower:
-        return f"SELECT COUNT(*) as total_count FROM {table_name}"
-    elif "total" in question_lower and "quantity" in question_lower:
-        if "Quantity" in columns:
-            return f"SELECT SUM(Quantity) as total_quantity FROM {table_name}"
-    elif "cancelled" in question_lower or "canceled" in question_lower:
-        status_col = next((col for col in columns if "status" in col.lower()), None)
-        if status_col:
-            return f"SELECT * FROM {table_name} WHERE `{status_col}` LIKE '%Cancel%'"
-    elif "supplier" in question_lower and "most" in question_lower:
-        supplier_col = next((col for col in columns if "supplier" in col.lower()), None)
-        if supplier_col:
-            return f"SELECT `{supplier_col}`, COUNT(*) as order_count FROM {table_name} GROUP BY `{supplier_col}` ORDER BY order_count DESC LIMIT 5"
-    elif "average" in question_lower and "price" in question_lower:
-        price_col = next((col for col in columns if "price" in col.lower()), None)
-        if price_col:
-            return f"SELECT AVG(`{price_col}`) as avg_price FROM {table_name}"
-    elif "show" in question_lower or "display" in question_lower or "list" in question_lower:
-        return f"SELECT * FROM {table_name} LIMIT 10"
-    
-    return f"SELECT * FROM {table_name} LIMIT 10"
 
 def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None):
     """Generate SQL query using Gemini with fallback to pattern matching"""
@@ -561,9 +529,6 @@ SQL Query:"""
     else:
         logger.info("Gemini not available, using pattern matching")
     
-    fallback_query = generate_pattern_based_sql(user_question, table_name, columns)
-    logger.info(f"Generated SQL query via pattern matching: {fallback_query}")
-    return fallback_query
 
 def execute_query(conn, sql_query):
     """Execute the SQL query"""
