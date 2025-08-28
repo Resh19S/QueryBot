@@ -227,7 +227,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
               >
                 <div className="flex items-center">
                   <FileText className="mr-2" size={20} />
-                  Data Summary
+                  Data Insights 
                 </div>
                 <motion.div
                   animate={{ rotate: isSummaryExpanded ? 180 : 0 }}
