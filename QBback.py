@@ -196,7 +196,26 @@ def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
         # Identify numeric columns and calculate basic stats
         numeric_insights = []
         categorical_insights = []
-        
+
+        insights = {
+        'total_records': total_records,
+        'key_metrics': {},
+        'patterns': []
+        }
+
+        for col in columns:
+           values = [row.get(col) for row in query_results if row.get(col) is not None]
+           try:
+               numeric_values = [float(v) for v in values if str(v).replace('.', '').replace('-', '').replace(',', '').isdigit()]
+               if len(numeric_values) > 0:
+                    insights['key_metrics'][col] = {
+                'min': min(numeric_values),
+                'max': max(numeric_values),
+                'avg': round(sum(numeric_values) / len(numeric_values), 2)
+               }
+           except:
+                continue
+
         if query_results:
             for col in columns:
                 values = [row.get(col) for row in query_results if row.get(col) is not None]
@@ -224,51 +243,59 @@ def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
                             })
         
         system_prompt = """You are an expert data analyst. Generate a concise, insightful summary of query results.
-Focus on:
-1. Key patterns and trends in the data
-2. Notable findings or outliers
-3. Business implications
-4. Clear, actionable insights
+ANALYSIS APPROACH:
+- Focus on actionable business insights, not just data description
+- Identify trends, patterns, and outliers that matter
+- Provide context for what the numbers mean
+- Suggest implications or next steps when relevant
 
-Rules:
-- Write in a professional, analytical tone
-- Keep it concise (2-4 sentences)
-- Focus on what the data reveals, not just counts
-- Use specific numbers and insights
-- Make it valuable for business decision-making"""
+RESPONSE FORMAT:
+- Write 2-4 clear, professional sentences
+- Start with the most important finding
+- Use specific numbers and percentages
+- End with business relevance or implication
 
-        prompt = f"""Analyze these query results and provide an insightful summary:
+TONE: Professional, confident, insight-driven (not just descriptive)"""
+        
+        query_intent = "general"
+        if any(word in user_question.lower() for word in ['top', 'highest', 'best', 'maximum']):
+           query_intent = "ranking"
+        elif any(word in user_question.lower() for word in ['total', 'sum', 'count', 'how many']):
+           query_intent = "aggregation"
+        elif any(word in user_question.lower() for word in ['average', 'mean']):
+           query_intent = "central_tendency"
+        elif any(word in user_question.lower() for word in ['compare', 'vs', 'difference']):
+           query_intent = "comparison"
 
+        prompt = f"""BUSINESS QUERY ANALYSIS:
+
+Query Intent: {query_intent}
 User Question: "{user_question}"
-SQL Query: {sql_query}
-Total Records: {total_records}
-Columns: {', '.join(columns)}
+Results Found: {total_records} records
 
-Numeric Insights: {numeric_insights}
-Categorical Insights: {categorical_insights}
+KEY METRICS: {insights['key_metrics']}
+REPRESENTATIVE DATA: {data_sample}
 
-Sample Data (first few records): {data_sample}
+ANALYSIS REQUIREMENTS:
+- What does this data reveal about the business situation?
+- What are the key takeaways for decision-making?
+- Are there any notable patterns or outliers?
 
-Generate an analytical summary focusing on key insights and patterns:"""
+Generate executive summary:"""
 
         summary = client_to_use.generate_response(prompt, system_prompt)
         
         if summary:
-            # Clean up the summary
-            summary = summary.strip()
-            # Remove any unwanted prefixes
-            if summary.lower().startswith(('summary:', 'analysis:', 'insight:')):
-                summary = summary.split(':', 1)[1].strip()
-            
-            logger.info("Generated AI summary successfully")
-            return summary
-        else:
-            logger.warning("AI summary generation failed")
-            return None
-            
-    except Exception as e:
-        logger.error(f"Error generating AI summary: {str(e)}")
-        return None
+    # Clean and optimize summary
+          summary = summary.strip()
+    # Remove common prefixes
+          prefixes_to_remove = ['summary:', 'analysis:', 'insight:', 'key finding:', 'result:']
+          for prefix in prefixes_to_remove:
+              if summary.lower().startswith(prefix):
+                  summary = summary[len(prefix):].strip()
+    
+          logger.info("Generated enhanced AI summary successfully")
+          return summary
 
 def detect_data_type_and_context(df):
     """Analyze the dataframe to detect what type of data it is"""
@@ -325,15 +352,23 @@ def generate_contextual_sample_questions(df, data_context, api_key=None):
             clean_sample.append(clean_row)
 
         system_prompt = """You are an expert data analyst. Generate 4 relevant sample questions that should relate to the dataset provided and that users would typically ask about their dataset.
-Rules:
-1. Return EXACTLY 4 questions, one per line
-2. make sure the questions generated are all answerable 
-3. Questions should be natural language, not technical
-4. Base questions on the actual column names and data patterns
-5. Make questions practical and business-relevant
-6. Use the exact column names from the data
-7. Don't use quotation marks around the questions
-8. Each question should be different and explore different aspects of the data"""
+QUESTION REQUIREMENTS:
+- Generate EXACTLY 4 questions, one per line
+- Each question must be answerable with the available data
+- Use natural business language (not technical jargon)
+- Include questions of varying complexity (simple to analytical)
+- Focus on real business insights, not just data counts
+
+QUESTION TYPES TO INCLUDE:
+1. One simple filtering/viewing question
+2. One aggregation question (totals, averages, counts)
+3. One ranking/comparison question
+4. One analytical/insight question
+
+OUTPUT FORMAT:
+- No numbering, bullets, or quotation marks
+- Each question on a separate line
+- Use exact column names from the dataset"""
         
         prompt = f"""Dataset Analysis:
 Data Context: {data_context}
@@ -363,7 +398,7 @@ Generate questions now:"""
                 
                 if len(questions) >= 3:
                     logger.info(f"Generated {len(questions)} contextual questions via Gemini")
-                    return questions[:6]
+                    return questions[:4]
             
         except Exception as e:
             logger.error(f"Error generating questions with Gemini: {str(e)}")
@@ -484,13 +519,34 @@ def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None)
         
         columns_str = ", ".join([f"{col[0]} ({col[1]})" for col in metadata['column_types']])
         sample_str = str(metadata['sample_data'][:2]) if metadata['sample_data'] else "No sample data"
+        numeric_cols = [col[0] for col in metadata['column_types'] if col[1].lower() in ['integer', 'real', 'numeric']]
+        text_cols = [col[0] for col in metadata['column_types'] if col[1].lower() in ['text', 'varchar']]
         
         system_prompt = """You are a SQL expert for data analysis.
-Convert natural language questions to precise SQLite queries.
-Return ONLY the SQL query, no explanations or formatting.
-Always use backticks around column names that might have spaces or special characters."""
+CORE RESPONSIBILITIES:
+- Convert natural language to precise SQLite queries
+- Prioritize business-relevant insights
+- Handle ambiguous requests intelligently
+
+OUTPUT REQUIREMENTS:
+- Return ONLY the SQL query (no explanations, markdown, or code blocks)
+- Use proper SQLite syntax with backticks for column names containing spaces
+- Limit results to 100 rows unless specifically asking for totals/aggregations
+
+QUERY OPTIMIZATION RULES:
+1. For "show me" requests: SELECT relevant columns with meaningful ORDER BY
+2. For "how many" requests: Use COUNT() with appropriate GROUP BY
+3. For "top/highest/best" requests: Use ORDER BY DESC with LIMIT
+4. For "average/total" requests: Use appropriate aggregation functions
+5. For date-related queries: Use proper date functions and formatting
+
+ERROR PREVENTION:
+- Always use backticks around column names with spaces or special characters
+- Use LIKE '%term%' for partial text matching
+- Handle potential NULL values appropriately
+- Use proper data type casting when needed"""
         
-        prompt = f"""Database Information:
+        prompt = f"""DATASET ANALYSIS:
 - Table name: {table_name}
 - Columns: {columns_str}
 - Sample data: {sample_str}
@@ -502,6 +558,10 @@ Rules:
 3. Use backticks for column names with spaces
 4. For business insights, use appropriate aggregations
 5. Limit large result sets to 100 rows unless asking for totals
+
+COLUMN TYPES:
+- Numeric columns: {numeric_cols}
+- Text columns: {text_cols}
 
 User Question: {user_question}
 
