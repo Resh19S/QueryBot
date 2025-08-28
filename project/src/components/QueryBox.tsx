@@ -213,7 +213,6 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
         stopListening();
       }
       onSubmit(query.trim());
-      setQuery('');
     }
   };
 
@@ -338,7 +337,7 @@ export const QueryBox: React.FC<QueryBoxProps> = ({
           </div>
           
           {/* Character count, status, and voice feedback */}
-          <div className="flex justify-between items-center mt-2 px-2">
+          <div className="flex justify-between items-center mt-0.05 px-2">
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 {query.length}/500 characters

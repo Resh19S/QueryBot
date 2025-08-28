@@ -20,11 +20,11 @@ export function PieChartComponent({ data, dataKey, nameKey }: PieChartComponentP
     if (active && payload && payload.length) {
       return (
         <div style={{
-          backgroundColor: 'white',
-          border: '1px solid #ccc',
+          backgroundColor: 'black',
+          border: '1px solid #333',
           borderRadius: '8px',
           padding: '8px 12px',
-          color: 'black',
+          color: 'white',
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}>
           <p style={{ margin: 0, fontWeight: 'bold' }}>
