@@ -81,64 +81,28 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     setIsActionProcessing(true);
     
     try {
-      // Enhanced payload structure optimized for n8n workflows
+      // Simple trigger - just a ping to start n8n workflow
       const payload = {
-        // Workflow metadata
-        trigger: 'data_analysis_action',
-        source: 'query_interface',
-        timestamp: new Date().toISOString(),
-        
-        // Query information
-        query: {
-          question: result.question,
-          sql_query: result.sql_query,
-          execution_time: new Date().toISOString()
-        },
-        
-        // Data structure info (useful for n8n processing)
-        data_info: {
-          total_rows: result.data.length,
-          columns: result.columns,
-          column_types: result.columns.reduce((acc, col) => {
-            if (result.data.length > 0) {
-              const sampleValue = result.data[0][col];
-              acc[col] = typeof sampleValue;
-            }
-            return acc;
-          }, {} as Record<string, string>)
-        },
-        
-        // Actual data (you might want to limit this for large datasets)
-        data: result.data.length > 100 ? result.data.slice(0, 100) : result.data,
-        data_truncated: result.data.length > 100,
-        
-        // Analysis summary
-        analysis: {
-          ai_summary: result.ai_summary,
-          summary: generateTextSummary()
-        }
+        trigger: 'action_button_clicked',
+        timestamp: new Date().toISOString()
       };
 
       const response = await fetch('https://7215b9f1f74c.ngrok-free.app/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'User-Agent': 'QueryInterface/1.0'
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         console.log('n8n workflow triggered successfully');
-        // Optional: Show success feedback to user
       } else {
         console.error('Failed to trigger n8n workflow:', response.status, response.statusText);
-        // Optional: Show error feedback to user
       }
     } catch (error) {
       console.error('Error triggering n8n workflow:', error);
-      // Optional: Show error feedback to user
     } finally {
       setIsActionProcessing(false);
     }
