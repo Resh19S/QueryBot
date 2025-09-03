@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Table, FileText, Send, BarChart3, Download, ChevronDown } from 'lucide-react';
+import { Table, FileText, Send, BarChart3, Download, ChevronDown, Zap } from 'lucide-react';
 import { DataTable } from './DataTable';
 import { PieChartComponent } from './charts/PieChart';
 import { BarChartComponent } from './charts/BarChart';
@@ -27,6 +27,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const [showChart, setShowChart] = useState<ChartType>(null);
   const [chartProcessing, setChartProcessing] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
 
   if (!result) return null;
 
@@ -74,6 +75,73 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleTakeAction = async () => {
+    setIsActionProcessing(true);
+    
+    try {
+      // Enhanced payload structure optimized for n8n workflows
+      const payload = {
+        // Workflow metadata
+        trigger: 'data_analysis_action',
+        source: 'query_interface',
+        timestamp: new Date().toISOString(),
+        
+        // Query information
+        query: {
+          question: result.question,
+          sql_query: result.sql_query,
+          execution_time: new Date().toISOString()
+        },
+        
+        // Data structure info (useful for n8n processing)
+        data_info: {
+          total_rows: result.data.length,
+          columns: result.columns,
+          column_types: result.columns.reduce((acc, col) => {
+            if (result.data.length > 0) {
+              const sampleValue = result.data[0][col];
+              acc[col] = typeof sampleValue;
+            }
+            return acc;
+          }, {} as Record<string, string>)
+        },
+        
+        // Actual data (you might want to limit this for large datasets)
+        data: result.data.length > 100 ? result.data.slice(0, 100) : result.data,
+        data_truncated: result.data.length > 100,
+        
+        // Analysis summary
+        analysis: {
+          ai_summary: result.ai_summary,
+          summary: generateTextSummary()
+        }
+      };
+
+      const response = await fetch('https://7215b9f1f74c.ngrok-free.app/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'User-Agent': 'QueryInterface/1.0'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('n8n workflow triggered successfully');
+        // Optional: Show success feedback to user
+      } else {
+        console.error('Failed to trigger n8n workflow:', response.status, response.statusText);
+        // Optional: Show error feedback to user
+      }
+    } catch (error) {
+      console.error('Error triggering n8n workflow:', error);
+      // Optional: Show error feedback to user
+    } finally {
+      setIsActionProcessing(false);
+    }
   };
 
   const getChartKeys = () => {
@@ -183,16 +251,35 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
                   Query Results
                 </h3>
                 
-                {/* Download Button */}
-                <motion.button
-                  onClick={downloadCSV}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download CSV</span>
-                </motion.button>
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-3">
+                  {/* Take Action Button */}
+                  <motion.button
+                    onClick={handleTakeAction}
+                    disabled={isActionProcessing}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isActionProcessing ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Zap className="w-4 h-4" />
+                    )}
+                    <span>{isActionProcessing ? 'Processing...' : 'Take Action'}</span>
+                  </motion.button>
+
+                  {/* Download Button */}
+                  <motion.button
+                    onClick={downloadCSV}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download CSV</span>
+                  </motion.button>
+                </div>
               </div>
             </div>
 
