@@ -296,6 +296,11 @@ Generate executive summary:"""
     
           logger.info("Generated enhanced AI summary successfully")
           return summary
+        
+    except Exception as e:  # <-- ADD THIS
+        logger.error(f"Error generating AI summary: {str(e)}")
+        return None
+
 
 def detect_data_type_and_context(df):
     """Analyze the dataframe to detect what type of data it is"""
