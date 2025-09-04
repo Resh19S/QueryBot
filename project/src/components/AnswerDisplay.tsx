@@ -81,28 +81,62 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     setIsActionProcessing(true);
     
     try {
-      // Simple trigger - just a ping to start n8n workflow
+      // Payload to send to both webhooks
       const payload = {
         trigger: 'action_button_clicked',
         timestamp: new Date().toISOString()
       };
 
-      const response = await fetch('https://7215b9f1f74c.ngrok-free.app/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        },
-        body: JSON.stringify(payload)
+      // Define both webhook URLs
+      const webhookUrls = [
+        'https://7215b9f1f74c.ngrok-free.app/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb',
+        'http://localhost:5678/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb'
+      ];
+
+      // Call both webhooks simultaneously
+      const promises = webhookUrls.map(async (url) => {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            console.log(`Webhook triggered successfully: ${url}`);
+            return { url, success: true, status: response.status };
+          } else {
+            console.error(`Failed to trigger webhook ${url}:`, response.status, response.statusText);
+            return { url, success: false, status: response.status, error: response.statusText };
+          }
+        } catch (error) {
+          console.error(`Error calling webhook ${url}:`, error);
+          return { url, success: false, error: error.message };
+        }
       });
 
-      if (response.ok) {
-        console.log('n8n workflow triggered successfully');
-      } else {
-        console.error('Failed to trigger n8n workflow:', response.status, response.statusText);
-      }
+      // Wait for all webhook calls to complete
+      const results = await Promise.allSettled(promises);
+      
+      // Log results
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const webhookResult = result.value;
+          if (webhookResult.success) {
+            console.log(`✅ Webhook ${index + 1} succeeded:`, webhookResult.url);
+          } else {
+            console.log(`❌ Webhook ${index + 1} failed:`, webhookResult.url, webhookResult.error);
+          }
+        } else {
+          console.log(`❌ Webhook ${index + 1} promise rejected:`, result.reason);
+        }
+      });
+
     } catch (error) {
-      console.error('Error triggering n8n workflow:', error);
+      console.error('Error in handleTakeAction:', error);
     } finally {
       setIsActionProcessing(false);
     }
