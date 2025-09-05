@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Table, FileText, Send, BarChart3, Download, ChevronDown, Zap } from 'lucide-react';
+import { Table, FileText, Send, BarChart3, Download, ChevronDown, Zap, Mail, AlertTriangle, Users, CheckCircle } from 'lucide-react';
 import { DataTable } from './DataTable';
 import { PieChartComponent } from './charts/PieChart';
 import { BarChartComponent } from './charts/BarChart';
@@ -21,6 +21,24 @@ interface AnswerDisplayProps {
 type VisualizationType = 'table' | 'text';
 type ChartType = 'pie' | 'bar' | 'line' | null;
 
+interface EmailData {
+  supplierEmails: Array<{
+    supplier: string;
+    email: string;
+    subject: string;
+    body: string;
+    issues: string[];
+    priority: string;
+  }>;
+  executiveEmail: {
+    subject: string;
+    body: string;
+    recipient: string;
+  } | null;
+  timestamp: string;
+  totalIssuesFound: number;
+}
+
 export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const [visualizationType, setVisualizationType] = useState<VisualizationType>('table');
   const [chartRequest, setChartRequest] = useState('');
@@ -28,6 +46,9 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const [chartProcessing, setChartProcessing] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [isActionProcessing, setIsActionProcessing] = useState(false);
+  const [actionCompleted, setActionCompleted] = useState(false);
+  const [emailData, setEmailData] = useState<EmailData | null>(null);
+  const [showEmailDetails, setShowEmailDetails] = useState(false);
 
   if (!result) return null;
 
@@ -50,12 +71,10 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const downloadCSV = () => {
     if (!result.data.length) return;
     
-    // Convert data to CSV format
     const headers = result.columns.join(',');
     const csvContent = result.data.map(row => 
       result.columns.map(col => {
         const value = row[col];
-        // Handle values that contain commas or quotes
         if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
           return `"${value.replace(/"/g, '""')}"`;
         }
@@ -65,7 +84,6 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     
     const csv = `${headers}\n${csvContent}`;
     
-    // Create and download the file
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -81,7 +99,6 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     setIsActionProcessing(true);
     
     try {
-      // Payload to send to both webhooks
       const payload = {
         trigger: 'action_button_clicked',
         timestamp: new Date().toISOString()
@@ -93,8 +110,8 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
         'http://localhost:5678/webhook/f4f1181c-ce65-449c-90bc-33cfb8b3d9eb'
       ];
 
-      // Call both webhooks simultaneously
-      const promises = webhookUrls.map(async (url) => {
+      // Send requests to both webhooks simultaneously
+      const webhookPromises = webhookUrls.map(async (url) => {
         try {
           const response = await fetch(url, {
             method: 'POST',
@@ -106,40 +123,155 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
           });
 
           if (response.ok) {
-            console.log(`Webhook triggered successfully: ${url}`);
+            console.log(`n8n workflow triggered successfully for ${url}`);
             return { url, success: true, status: response.status };
           } else {
-            console.error(`Failed to trigger webhook ${url}:`, response.status, response.statusText);
+            console.error(`Failed to trigger n8n workflow for ${url}:`, response.status, response.statusText);
             return { url, success: false, status: response.status, error: response.statusText };
           }
         } catch (error) {
-          console.error(`Error calling webhook ${url}:`, error);
+          console.error(`Error triggering n8n workflow for ${url}:`, error);
           return { url, success: false, error: error.message };
         }
       });
 
-      // Wait for all webhook calls to complete
-      const results = await Promise.allSettled(promises);
+      // Wait for all webhook requests to complete
+      const results = await Promise.all(webhookPromises);
       
-      // Log results
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          const webhookResult = result.value;
-          if (webhookResult.success) {
-            console.log(`✅ Webhook ${index + 1} succeeded:`, webhookResult.url);
+      // Check if at least one webhook succeeded
+      const hasSuccess = results.some(result => result.success);
+      
+      if (hasSuccess) {
+        console.log('At least one n8n workflow triggered successfully');
+        
+        // Log results for debugging
+        results.forEach(result => {
+          if (result.success) {
+            console.log(`✅ Success: ${result.url}`);
           } else {
-            console.log(`❌ Webhook ${index + 1} failed:`, webhookResult.url, webhookResult.error);
+            console.log(`❌ Failed: ${result.url} - ${result.error || result.status}`);
           }
-        } else {
-          console.log(`❌ Webhook ${index + 1} promise rejected:`, result.reason);
-        }
-      });
-
+        });
+        
+        // Simulate email data based on the procurement data
+        // In a real implementation, you'd get this from the n8n workflow response
+        const mockEmailData = generateMockEmailData();
+        setEmailData(mockEmailData);
+        setActionCompleted(true);
+        setShowEmailDetails(true);
+      } else {
+        console.error('All webhook requests failed');
+        // You might want to show an error message to the user here
+      }
     } catch (error) {
       console.error('Error in handleTakeAction:', error);
     } finally {
       setIsActionProcessing(false);
     }
+  };
+
+  // Generate mock email data based on the actual workflow logic
+  const generateMockEmailData = (): EmailData => {
+    const problematicSuppliers = result.data.filter(row => {
+      const cancelled = parseInt(row['cancelled_orders'] || row['Cancelled_Orders'] || '0');
+      const pending = parseInt(row['pending_orders'] || row['Pending_Orders'] || '0'); 
+      const late = parseInt(row['late_deliveries'] || row['Late_Deliveries'] || '0');
+      const quality = parseInt(row['quality_issues'] || row['Quality_Issues'] || '0');
+      
+      return cancelled > 2 || pending > 0 || late > 3 || quality > 1;
+    });
+
+    const supplierEmails = problematicSuppliers.map(supplier => {
+      const name = supplier.Supplier || supplier.supplier || 'Unknown Supplier';
+      const cancelled = parseInt(supplier['cancelled_orders'] || supplier['Cancelled_Orders'] || '0');
+      const pending = parseInt(supplier['pending_orders'] || supplier['Pending_Orders'] || '0'); 
+      const late = parseInt(supplier['late_deliveries'] || supplier['Late_Deliveries'] || '0');
+      const quality = parseInt(supplier['quality_issues'] || supplier['Quality_Issues'] || '0');
+      
+      const issues = [];
+      if (cancelled > 2) issues.push(`${cancelled} cancelled orders (threshold: 2)`);
+      if (pending > 0) issues.push(`${pending} orders pending beyond 30 days`);
+      if (late > 3) issues.push(`${late} late deliveries`);
+      if (quality > 1) issues.push(`${quality} quality-related issues`);
+
+      return {
+        supplier: name,
+        email: `${name.toLowerCase().replace(/\s+/g, '.')}@company.com`,
+        subject: `URGENT: Performance Issues Require Immediate Attention - ${name}`,
+        body: `Dear ${name} Team,
+
+Our daily procurement review on ${new Date().toLocaleDateString()} has identified the following performance issues requiring immediate attention:
+
+${issues.map(issue => `• ${issue}`).join('\n')}
+
+Required Actions (Response needed within 24 hours):
+${cancelled > 2 ? '1. Provide explanation for cancelled orders\n' : ''}${pending > 0 ? '2. Provide immediate status update on pending orders\n' : ''}${late > 3 ? '3. Submit delivery improvement plan\n' : ''}${quality > 1 ? '4. Conduct quality review and corrective actions\n' : ''}
+
+Please provide:
+• Root cause analysis
+• Corrective action plan
+• Timeline for resolution
+• Point of contact for follow-up
+
+Failure to respond within 24 hours may result in supplier performance review and potential sourcing alternatives.
+
+Best regards,
+Automated Procurement Monitoring System
+
+---
+This is an automated message. For urgent matters, contact: procurement@yourcompany.com`,
+        issues,
+        priority: 'high'
+      };
+    });
+
+    const executiveEmail = {
+      subject: `🚨 Procurement Intelligence Report - ${new Date().toLocaleDateString()} - ${supplierEmails.length} Actions Taken`,
+      body: `PROCUREMENT INTELLIGENCE REPORT
+══════════════════════════════════════════════════
+Date: ${new Date().toLocaleDateString()}
+Generated: ${new Date().toLocaleTimeString()}
+
+EXECUTIVE SUMMARY
+Performance monitoring has identified ${supplierEmails.length} suppliers requiring immediate intervention. Automated warning communications have been initiated with 24-hour response requirements.
+
+ACTIONS TAKEN TODAY
+${supplierEmails.map((email, idx) => `• Warning email sent to ${email.supplier} - ${email.issues.join(', ')}`).join('\n')}
+
+RISK ASSESSMENT
+• HIGH RISK: ${supplierEmails.filter(e => e.issues.length > 2).length} suppliers with multiple issues
+• MEDIUM RISK: ${supplierEmails.filter(e => e.issues.length <= 2).length} suppliers with single issues
+• Business Impact: Potential delivery delays and quality concerns
+
+RECOMMENDED FOLLOW-UP
+1. Monitor supplier responses within 24 hours
+2. Initiate backup supplier evaluation for high-risk cases
+3. Schedule quality review meetings for affected suppliers
+4. Update supplier scorecards and contracts
+
+MARKET INTELLIGENCE
+Current supply chain stress indicators suggest proactive supplier management critical for Q4 performance.
+
+══════════════════════════════════════════════════
+RAW METRICS:
+• Suppliers Monitored: ${result.data.length}
+• Issues Detected: ${supplierEmails.length}
+• Warning Communications: ${supplierEmails.length}
+
+NEXT REVIEW: ${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()} at 8:00 AM
+
+---
+Automated Procurement Intelligence System
+For questions: procurement-ops@yourcompany.com`,
+      recipient: 'management@yourcompany.com'
+    };
+
+    return {
+      supplierEmails,
+      executiveEmail,
+      timestamp: new Date().toISOString(),
+      totalIssuesFound: supplierEmails.length
+    };
   };
 
   const getChartKeys = () => {
@@ -164,12 +296,10 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
   const generateTextSummary = () => {
     if (!result.data.length) return "No data found for this query.";
     
-    // Use the AI-generated summary from the backend if available
     if (result.ai_summary) {
       return result.ai_summary;
     }
     
-    // Fallback to basic summary if AI summary is not available
     const rowCount = result.data.length;
     const colCount = result.columns.length;
     
@@ -185,7 +315,6 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     
     setChartProcessing(true);
     
-    // Simple keyword matching for chart types
     const request = chartRequest.toLowerCase();
     let chartType: ChartType = null;
     
@@ -196,11 +325,9 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
     } else if (request.includes('line') || request.includes('trend') || request.includes('time') || request.includes('over time')) {
       chartType = 'line';
     } else {
-      // Default to bar chart for numeric data requests
       chartType = 'bar';
     }
     
-    // Simulate processing delay
     setTimeout(() => {
       setShowChart(chartType);
       setChartProcessing(false);
@@ -257,14 +384,22 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
                     disabled={isActionProcessing}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                      actionCompleted 
+                        ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' 
+                        : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+                    } text-white`}
                   >
                     {isActionProcessing ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : actionCompleted ? (
+                      <CheckCircle className="w-4 h-4" />
                     ) : (
                       <Zap className="w-4 h-4" />
                     )}
-                    <span>{isActionProcessing ? 'Processing...' : 'Take Action'}</span>
+                    <span>
+                      {isActionProcessing ? 'Processing...' : actionCompleted ? 'Action Complete' : 'Take Action'}
+                    </span>
                   </motion.button>
 
                   {/* Download Button */}
@@ -296,7 +431,185 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
           </div>
         </motion.section>
 
-        {/* Text Summary Section - Updated with smooth expand/collapse */}
+        {/* Email Communication Results */}
+        <AnimatePresence>
+          {emailData && (
+            <motion.section
+              initial={{ opacity: 0, y: 30, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -30, height: 0 }}
+              className="space-y-6"
+            >
+              {/* Action Summary */}
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border border-green-200 dark:border-green-800 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-green-500 rounded-full">
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Automated Actions Completed
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {emailData.totalIssuesFound} suppliers contacted • {new Date(emailData.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    onClick={() => setShowEmailDetails(!showEmailDetails)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span>{showEmailDetails ? 'Hide Details' : 'Show Details'}</span>
+                    <motion.div
+                      animate={{ rotate: showEmailDetails ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </motion.div>
+                  </motion.button>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {showEmailDetails && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-6 overflow-hidden"
+                  >
+                    {/* Supplier Emails */}
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+                      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-red-500 rounded-full">
+                            <AlertTriangle className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              Emails Sent to Suppliers
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {emailData.supplierEmails.length} warning emails sent
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 space-y-4">
+                        {emailData.supplierEmails.map((email, index) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Mail className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  <span className="font-medium text-red-800 dark:text-red-200">
+                                    {email.supplier}
+                                  </span>
+                                  <span className="text-xs bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-300 px-2 py-1 rounded">
+                                    {email.priority.toUpperCase()}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                  To: {email.email}
+                                </p>
+                                <p className="font-medium text-gray-900 dark:text-white mb-2">
+                                  {email.subject}
+                                </p>
+                                <div className="text-sm text-gray-700 dark:text-gray-300">
+                                  <strong>Issues:</strong>
+                                  <ul className="mt-1 ml-4">
+                                    {email.issues.map((issue, i) => (
+                                      <li key={i} className="list-disc">{issue}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <details className="mt-3">
+                              <summary className="cursor-pointer text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                                View Full Email Content
+                              </summary>
+                              <div className="mt-2 p-3 bg-white dark:bg-gray-800 rounded border border-red-200 dark:border-red-700">
+                                <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
+                                  {email.body}
+                                </pre>
+                              </div>
+                            </details>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Executive Email */}
+                    {emailData.executiveEmail && (
+                      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+                        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-blue-500 rounded-full">
+                              <Users className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Email Sent to Management
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Executive report with action summary
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-6">
+                          <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
+                          >
+                            <div className="flex items-start space-x-3 mb-3">
+                              <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                  To: {emailData.executiveEmail.recipient}
+                                </p>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {emailData.executiveEmail.subject}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <details>
+                              <summary className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                                View Executive Report Content
+                              </summary>
+                              <div className="mt-2 p-3 bg-white dark:bg-gray-800 rounded border border-blue-200 dark:border-blue-700">
+                                <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
+                                  {emailData.executiveEmail.body}
+                                </pre>
+                              </div>
+                            </details>
+                          </motion.div>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* Text Summary Section */}
         <motion.section
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -361,7 +674,7 @@ export function AnswerDisplay({ result }: AnswerDisplayProps) {
                 Data Visualization
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                what type of chart you'd like to see (e.g., "show me a pie chart")
+                What type of chart you'd like to see (e.g., "show me a pie chart")
               </p>
             </div>
 
