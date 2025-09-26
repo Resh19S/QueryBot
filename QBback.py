@@ -188,7 +188,7 @@ class GeminiClient:
             return None
 
 # Initialize Gemini client
-gemini_client = GeminiClient()
+gemini_client = GeminiClient(model="gemini-1.5-flash-latest")
 
 def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
     """Generate AI-powered analytical summary of query results"""
