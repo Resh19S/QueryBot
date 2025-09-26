@@ -47,7 +47,7 @@ class QueryResponse(BaseModel):
     ai_summary: Optional[str] = None  # Add AI summary field
 
 class GeminiSettings(BaseModel):
-    model: str = "gemini-1.5-flash"
+    model: str = "gemini-1.5-flash-latest"
     api_key: Optional[str] = None
     temperature: float = 0.0
     top_p: float = 0.9
@@ -75,7 +75,7 @@ else:
 
 # Gemini Client Class
 class GeminiClient:
-    def __init__(self, model="gemini-1.5-flash", api_key=None):
+    def __init__(self, model="gemini-1.5-flash-latest", api_key=None):
         self.model = model
         self.api_key = api_key or DEFAULT_API_KEY
         self.temperature = 0.0
@@ -619,7 +619,6 @@ def execute_query(conn, sql_query):
         raise HTTPException(status_code=500, detail=f"SQL execution error: {str(e)}")
 
 # API Endpoints
-
 @app.get("/")
 async def root():
     return {"message": "supply_chain_data, API with Gemini", "status": "running"}
