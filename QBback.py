@@ -11,8 +11,16 @@ import uvicorn
 import logging
 import os
 import re
-from dotenv import load_dotenv  # Add this import
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Clear Google Cloud environment variables that interfere with Gemini API
 google_vars_to_clear = [
     'GOOGLE_APPLICATION_CREDENTIALS',
     'GOOGLE_CLOUD_PROJECT', 
@@ -28,19 +36,12 @@ for var in google_vars_to_clear:
         logger.info(f"Clearing potentially interfering environment variable: {var}")
         del os.environ[var]
 
-# Load environment variables from .env file
-load_dotenv()  # Add this line
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 app = FastAPI(title="Data Analytics API", version="1.0.0")
 
 # Add CORS middleware to allow requests from React app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://querybot-three.vercel.app"],  # Allow all origins for development
+    allow_origins=["https://querybot-three.vercel.app"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -59,10 +60,10 @@ class QueryResponse(BaseModel):
     question: str
     sql_query: Optional[str] = None
     message: Optional[str] = None
-    ai_summary: Optional[str] = None  # Add AI summary field
+    ai_summary: Optional[str] = None
 
 class GeminiSettings(BaseModel):
-    model: str = "gemini-1.5-flash-latest"
+    model: str = "gemini-1.5-flash"
     api_key: Optional[str] = None
     temperature: float = 0.0
     top_p: float = 0.9
@@ -79,7 +80,7 @@ class SampleQuestionsResponse(BaseModel):
 current_dataframe: Optional[pd.DataFrame] = None
 current_connection: Optional[sqlite3.Connection] = None
 
-# Default API key - now properly loaded from .env file
+# Default API key - loaded from .env file
 DEFAULT_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Add debug logging to verify the API key is loaded
@@ -88,31 +89,40 @@ if DEFAULT_API_KEY:
 else:
     logger.warning("No GEMINI_API_KEY found in environment variables")
 
-# Gemini Client Class
+# Gemini Client Class - Focused on Working
 class GeminiClient:
-    def __init__(self, model="gemini-1.5-flash-latest", api_key=None):
+    def __init__(self, model="gemini-1.5-flash", api_key=None):
         self.model = model
         self.api_key = api_key or DEFAULT_API_KEY
         self.temperature = 0.0
         self.top_p = 0.9
+        self.client = None
         self._configure_client()
     
     def _configure_client(self):
         """Configure the Gemini client with API key"""
+        if not self.api_key or self.api_key == "YOUR_DEFAULT_API_KEY_HERE":
+            logger.error("No valid API key provided for Gemini")
+            raise ValueError("Valid API key required for Gemini")
+        
         try:
-            if self.api_key and self.api_key != "YOUR_DEFAULT_API_KEY_HERE":
-                genai.configure(api_key=None)
-                genai.configure(api_key=self.api_key)
-                self.client = genai.GenerativeModel(self.model)
-                logger.info(f"Gemini client configured with model: {self.model}")
-            else:
-                logger.warning("No valid API key provided")
-                self.client = None
+            # Force clear any existing configuration
+            genai.configure(api_key=None)
+            
+            # Configure with your API key
+            genai.configure(api_key=self.api_key)
+            self.client = genai.GenerativeModel(self.model)
+            logger.info(f"Gemini client configured successfully with model: {self.model}")
+            
+            # Test the connection immediately
+            if not self._test_connection():
+                raise Exception("Gemini connection test failed")
+                
         except Exception as e:
             logger.error(f"Error configuring Gemini client: {e}")
-            self.client = None
+            raise Exception(f"Failed to configure Gemini: {e}")
     
-    def test_connection(self):
+    def _test_connection(self):
         """Test if Gemini API is accessible"""
         try:
             if not self.client:
@@ -125,39 +135,19 @@ class GeminiClient:
                     max_output_tokens=10
                 )
             )
-            return response.text.strip().lower() == "test"
+            result = response.text.strip().lower() == "test"
+            logger.info(f"Gemini connection test: {'PASSED' if result else 'FAILED'}")
+            return result
         except Exception as e:
-            logger.warning(f"Gemini connection test failed: {e}")
+            logger.error(f"Gemini connection test failed: {e}")
             return False
     
-    def get_available_models(self):
-        """Get list of available Gemini models"""
-        try:
-            if not self.api_key or self.api_key == "YOUR_DEFAULT_API_KEY_HERE":
-                return []
-            
-            genai.configure(api_key=self.api_key)
-            models = []
-            for model in genai.list_models():
-                if 'generateContent' in model.supported_generation_methods:
-                    models.append(model.name.replace('models/', ''))
-            return models
-        except Exception as e:
-            logger.warning(f"Failed to get available models: {e}")
-            return ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-    
-    def update_api_key(self, api_key: str):
-        """Update the API key and reconfigure client"""
-        self.api_key = api_key
-        self._configure_client()
-    
     def generate_response(self, prompt, system_prompt=None):
-        """Generate response using Gemini"""
+        """Generate response using Gemini - Must work"""
+        if not self.client:
+            raise Exception("Gemini client not configured properly")
+        
         try:
-            if not self.client:
-                logger.error("Gemini client not configured properly")
-                return None
-            
             full_prompt = prompt
             if system_prompt:
                 full_prompt = f"{system_prompt}\n\n{prompt}"
@@ -175,33 +165,34 @@ class GeminiClient:
                 generation_config=generation_config
             )
             
-            if response.text:
-                result = response.text.strip()
-                logger.info(f"Gemini response received: {result[:100]}...")
-                return result
-            else:
-                logger.error("Gemini returned empty response")
-                return None
+            if not response.text:
+                raise Exception("Gemini returned empty response")
+                
+            result = response.text.strip()
+            logger.info(f"Gemini response received successfully: {result[:100]}...")
+            return result
                 
         except Exception as e:
             logger.error(f"Gemini API error: {str(e)}")
-            return None
+            raise Exception(f"Gemini failed: {str(e)}")
 
-# Initialize Gemini client
-gemini_client = GeminiClient(model="gemini-1.5-flash-latest")
+# Initialize Gemini client - must work or fail fast
+try:
+    gemini_client = GeminiClient(model="gemini-1.5-flash")
+    logger.info("Global Gemini client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Gemini client: {e}")
+    # Don't start the server if Gemini doesn't work
+    raise Exception(f"Cannot start server without working Gemini: {e}")
 
 def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
     """Generate AI-powered analytical summary of query results"""
     
-    client_to_use = gemini_client
-    if api_key:
-        client_to_use = GeminiClient(api_key=api_key)
-    
-    if not client_to_use.test_connection():
-        logger.info("Gemini not available for summary generation")
-        return None
-    
     try:
+        client_to_use = gemini_client
+        if api_key:
+            client_to_use = GeminiClient(model="gemini-1.5-flash", api_key=api_key)
+        
         # Prepare data sample for analysis (limit to avoid token limits)
         data_sample = query_results[:10] if len(query_results) > 10 else query_results
         
@@ -209,54 +200,25 @@ def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
         total_records = len(query_results)
         columns = list(query_results[0].keys()) if query_results else []
         
-        # Identify numeric columns and calculate basic stats
-        numeric_insights = []
-        categorical_insights = []
-
+        # Calculate basic stats
         insights = {
-        'total_records': total_records,
-        'key_metrics': {},
-        'patterns': []
+            'total_records': total_records,
+            'key_metrics': {},
+            'patterns': []
         }
 
         for col in columns:
-           values = [row.get(col) for row in query_results if row.get(col) is not None]
-           try:
-               numeric_values = [float(v) for v in values if str(v).replace('.', '').replace('-', '').replace(',', '').isdigit()]
-               if len(numeric_values) > 0:
+            values = [row.get(col) for row in query_results if row.get(col) is not None]
+            try:
+                numeric_values = [float(v) for v in values if str(v).replace('.', '').replace('-', '').replace(',', '').isdigit()]
+                if len(numeric_values) > 0:
                     insights['key_metrics'][col] = {
-                'min': min(numeric_values),
-                'max': max(numeric_values),
-                'avg': round(sum(numeric_values) / len(numeric_values), 2)
-               }
-           except:
+                        'min': min(numeric_values),
+                        'max': max(numeric_values),
+                        'avg': round(sum(numeric_values) / len(numeric_values), 2)
+                    }
+            except:
                 continue
-
-        if query_results:
-            for col in columns:
-                values = [row.get(col) for row in query_results if row.get(col) is not None]
-                
-                # Check if column is numeric
-                try:
-                    numeric_values = [float(v) for v in values if str(v).replace('.', '').replace('-', '').isdigit()]
-                    if len(numeric_values) > 0:
-                        numeric_insights.append({
-                            'column': col,
-                            'min': min(numeric_values),
-                            'max': max(numeric_values),
-                            'avg': sum(numeric_values) / len(numeric_values),
-                            'count': len(numeric_values)
-                        })
-                except:
-                    # Handle categorical data
-                    if len(values) > 0:
-                        unique_values = list(set([str(v) for v in values]))
-                        if len(unique_values) <= 10:  # Only for manageable categories
-                            categorical_insights.append({
-                                'column': col,
-                                'unique_count': len(unique_values),
-                                'top_values': unique_values[:5]
-                            })
         
         system_prompt = """You are an expert data analyst. Generate a concise, insightful summary of query results.
 ANALYSIS APPROACH:
@@ -275,13 +237,13 @@ TONE: Professional, confident, insight-driven (not just descriptive)"""
         
         query_intent = "general"
         if any(word in user_question.lower() for word in ['top', 'highest', 'best', 'maximum']):
-           query_intent = "ranking"
+            query_intent = "ranking"
         elif any(word in user_question.lower() for word in ['total', 'sum', 'count', 'how many']):
-           query_intent = "aggregation"
+            query_intent = "aggregation"
         elif any(word in user_question.lower() for word in ['average', 'mean']):
-           query_intent = "central_tendency"
+            query_intent = "central_tendency"
         elif any(word in user_question.lower() for word in ['compare', 'vs', 'difference']):
-           query_intent = "comparison"
+            query_intent = "comparison"
 
         prompt = f"""BUSINESS QUERY ANALYSIS:
 
@@ -302,21 +264,20 @@ Generate executive summary:"""
         summary = client_to_use.generate_response(prompt, system_prompt)
         
         if summary:
-    # Clean and optimize summary
-          summary = summary.strip()
-    # Remove common prefixes
-          prefixes_to_remove = ['summary:', 'analysis:', 'insight:', 'key finding:', 'result:']
-          for prefix in prefixes_to_remove:
-              if summary.lower().startswith(prefix):
-                  summary = summary[len(prefix):].strip()
-    
-          logger.info("Generated enhanced AI summary successfully")
-          return summary
+            # Clean and optimize summary
+            summary = summary.strip()
+            # Remove common prefixes
+            prefixes_to_remove = ['summary:', 'analysis:', 'insight:', 'key finding:', 'result:']
+            for prefix in prefixes_to_remove:
+                if summary.lower().startswith(prefix):
+                    summary = summary[len(prefix):].strip()
+            
+            logger.info("Generated AI summary successfully")
+            return summary
         
-    except Exception as e:  # <-- ADD THIS
+    except Exception as e:
         logger.error(f"Error generating AI summary: {str(e)}")
-        return None
-
+        raise Exception(f"AI summary generation failed: {str(e)}")
 
 def detect_data_type_and_context(df):
     """Analyze the dataframe to detect what type of data it is"""
@@ -352,14 +313,14 @@ def detect_data_type_and_context(df):
 def generate_contextual_sample_questions(df, data_context, api_key=None):
     """Generate sample questions based on the actual data structure and context"""
     
-    columns = df.columns.tolist()
-    sample_data = df.head(3).to_dict('records')
-    
-    client_to_use = gemini_client
-    if api_key:
-        client_to_use = GeminiClient(api_key=api_key)
-    
-    if client_to_use.test_connection():
+    try:
+        columns = df.columns.tolist()
+        sample_data = df.head(3).to_dict('records')
+        
+        client_to_use = gemini_client
+        if api_key:
+            client_to_use = GeminiClient(model="gemini-1.5-flash", api_key=api_key)
+        
         logger.info("Using Gemini to generate contextual sample questions")
         
         clean_sample = []
@@ -402,94 +363,29 @@ Focus on insights that would be valuable for business decision-making.
 
 Generate questions now:"""
 
-        try:
-            response = client_to_use.generate_response(prompt, system_prompt)
-            
-            if response:
-                questions = []
-                lines = response.strip().split('\n')
-                for line in lines:
-                    clean_line = line.strip()
-                    clean_line = re.sub(r'^\d+[\.\)]\s*', '', clean_line)
-                    clean_line = re.sub(r'^[-*]\s*', '', clean_line)
-                    clean_line = clean_line.strip('"\'')
-                    
-                    if clean_line and len(clean_line) > 10:
-                        questions.append(clean_line)
+        response = client_to_use.generate_response(prompt, system_prompt)
+        
+        if response:
+            questions = []
+            lines = response.strip().split('\n')
+            for line in lines:
+                clean_line = line.strip()
+                clean_line = re.sub(r'^\d+[\.\)]\s*', '', clean_line)
+                clean_line = re.sub(r'^[-*]\s*', '', clean_line)
+                clean_line = clean_line.strip('"\'')
                 
-                if len(questions) >= 3:
-                    logger.info(f"Generated {len(questions)} contextual questions via Gemini")
-                    return questions[:4]
+                if clean_line and len(clean_line) > 10:
+                    questions.append(clean_line)
             
-        except Exception as e:
-            logger.error(f"Error generating questions with Gemini: {str(e)}")
-    
-    logger.info("Using pattern-based question generation")
-    return generate_pattern_based_questions(df, data_context, columns)
-
-def generate_pattern_based_questions(df, data_context, columns):
-    """Generate questions based on data patterns when Gemini is unavailable"""
-    questions = []
-    
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-    
-    categorical_cols = []
-    for col in df.columns:
-        if df[col].dtype == 'object' and df[col].nunique() < len(df) * 0.5:
-            categorical_cols.append(col)
-    
-    if data_context == 'employee':
-        if any('salary' in col.lower() for col in numeric_cols):
-            salary_col = next((col for col in columns if 'salary' in col.lower()), None)
-            if salary_col:
-                questions.append(f"What is the average {salary_col.lower()}?")
-                questions.append(f"Who has the highest {salary_col.lower()}?")
+            if len(questions) >= 3:
+                logger.info(f"Generated {len(questions)} contextual questions via Gemini")
+                return questions[:4]
         
-        if any('department' in col.lower() for col in categorical_cols):
-            dept_col = next((col for col in columns if 'department' in col.lower()), None)
-            if dept_col:
-                questions.append(f"How many employees are in each {dept_col.lower()}?")
+        raise Exception("Gemini failed to generate valid questions")
         
-        questions.append("Show me the employee details")
-        questions.append("How many total employees are there?")
-        
-    elif data_context == 'sales':
-        if numeric_cols:
-            questions.append(f"What is the total {numeric_cols[0].lower()}?")
-            questions.append(f"What is the average {numeric_cols[0].lower()}?")
-        
-        if any('customer' in col.lower() for col in categorical_cols):
-            questions.append("Which customer has the most transactions?")
-        
-        questions.append("Show me the top 10 records by value")
-        questions.append("What is the sales distribution?")
-        
-    elif data_context == 'supply_chain':
-        questions.extend([
-            "What is the highest quantity ordered?",
-            "Show me all cancelled orders",
-            "Which supplier has the most orders?",
-            "What's the total value of all orders?"
-        ])
-        
-    else:
-        if numeric_cols:
-            questions.append(f"What is the average {numeric_cols[0]}?")
-            questions.append(f"Show me records with highest {numeric_cols[0]}")
-        
-        if categorical_cols:
-            questions.append(f"How many unique {categorical_cols[0]} are there?")
-            questions.append(f"Show me the distribution of {categorical_cols[0]}")
-        
-        questions.extend([
-            "Show me a sample of the data",
-            "How many total records are there?"
-        ])
-    
-    while len(questions) < 6:
-        questions.append("Show me a summary of the data")
-    
-    return questions[:6]
+    except Exception as e:
+        logger.error(f"Error generating questions with Gemini: {str(e)}")
+        raise Exception(f"Question generation failed: {str(e)}")
 
 def load_csv_to_sqlite(df, table_name="supply_chain_data"):
     """Convert CSV to SQLite table"""
@@ -525,17 +421,16 @@ def get_table_metadata(conn, table_name):
         logger.error(f"Error getting metadata: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting metadata: {str(e)}")
 
-
 def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None):
-    """Generate SQL query using Gemini with fallback to pattern matching"""
+    """Generate SQL query using Gemini - MUST work"""
     
-    columns = metadata['columns']
-    
-    client_to_use = gemini_client
-    if api_key:
-        client_to_use = GeminiClient(model="gemini-1.5-flash-latest", api_key=api_key)  # Specify model
-    
-    if client_to_use.test_connection():
+    try:
+        columns = metadata['columns']
+        
+        client_to_use = gemini_client
+        if api_key:
+            client_to_use = GeminiClient(model="gemini-1.5-flash", api_key=api_key)
+        
         logger.info("Using Gemini to generate SQL query")
         
         columns_str = ", ".join([f"{col[0]} ({col[1]})" for col in metadata['column_types']])
@@ -588,28 +483,30 @@ User Question: {user_question}
 
 SQL Query:"""
 
-        try:
-            sql_query = client_to_use.generate_response(prompt, system_prompt)
-            
-            if sql_query:
-                if sql_query.startswith('```'):
-                    lines = sql_query.split('\n')
-                    sql_query = '\n'.join(line for line in lines if not line.strip().startswith('```'))
-                
-                if sql_query.lower().startswith('sql'):
-                    sql_query = sql_query[3:].strip()
-                
-                sql_query = sql_query.strip().rstrip(';')
-                logger.info(f"Generated SQL query via Gemini: {sql_query}")
-                return sql_query
-            else:
-                logger.warning("Gemini returned empty response, falling back to pattern matching")
+        sql_query = client_to_use.generate_response(prompt, system_prompt)
         
-        except Exception as e:
-            logger.error(f"Error with Gemini SQL generation: {str(e)}")
-    else:
-        logger.info("Gemini not available, using pattern matching")
-    
+        if not sql_query:
+            raise Exception("Gemini returned empty SQL query")
+        
+        # Clean the response
+        if sql_query.startswith('```'):
+            lines = sql_query.split('\n')
+            sql_query = '\n'.join(line for line in lines if not line.strip().startswith('```'))
+        
+        if sql_query.lower().startswith('sql'):
+            sql_query = sql_query[3:].strip()
+        
+        sql_query = sql_query.strip().rstrip(';')
+        
+        if not sql_query:
+            raise Exception("SQL query is empty after cleaning")
+            
+        logger.info(f"Generated SQL query via Gemini: {sql_query}")
+        return sql_query
+        
+    except Exception as e:
+        logger.error(f"Error with Gemini SQL generation: {str(e)}")
+        raise Exception(f"SQL generation failed: {str(e)}")
 
 def execute_query(conn, sql_query):
     """Execute the SQL query"""
@@ -637,7 +534,7 @@ def execute_query(conn, sql_query):
 # API Endpoints
 @app.get("/")
 async def root():
-    return {"message": "supply_chain_data, API with Gemini", "status": "running"}
+    return {"message": "Data Analytics API with Gemini", "status": "running", "gemini_ready": True}
 
 @app.post("/upload-csv")
 async def upload_csv(file: UploadFile = File(...)):
@@ -744,4 +641,21 @@ async def process_query(request: QueryRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger
+        logger.error(f"Query processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
+
+# Health check endpoint specifically for Gemini
+@app.get("/health/gemini")
+async def gemini_health():
+    try:
+        test_result = gemini_client._test_connection()
+        return {
+            "gemini_status": "healthy" if test_result else "unhealthy",
+            "model": gemini_client.model,
+            "connection_test": test_result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gemini health check failed: {str(e)}")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
