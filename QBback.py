@@ -13,6 +13,21 @@ import os
 import re
 from dotenv import load_dotenv  # Add this import
 
+google_vars_to_clear = [
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'GOOGLE_CLOUD_PROJECT', 
+    'GCLOUD_PROJECT',
+    'GOOGLE_CLOUD_REGION',
+    'GOOGLE_CLOUD_ZONE',
+    'GOOGLE_API_USE_MTLS_ENDPOINT',
+    'GOOGLE_API_USE_CLIENT_CERTIFICATE'
+]
+
+for var in google_vars_to_clear:
+    if var in os.environ:
+        logger.info(f"Clearing potentially interfering environment variable: {var}")
+        del os.environ[var]
+
 # Load environment variables from .env file
 load_dotenv()  # Add this line
 
@@ -86,6 +101,7 @@ class GeminiClient:
         """Configure the Gemini client with API key"""
         try:
             if self.api_key and self.api_key != "YOUR_DEFAULT_API_KEY_HERE":
+                genai.configure(api_key=None)
                 genai.configure(api_key=self.api_key)
                 self.client = genai.GenerativeModel(self.model)
                 logger.info(f"Gemini client configured with model: {self.model}")
@@ -517,7 +533,7 @@ def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None)
     
     client_to_use = gemini_client
     if api_key:
-        client_to_use = GeminiClient(api_key=api_key)
+        client_to_use = GeminiClient(model="gemini-1.5-flash-latest", api_key=api_key)  # Specify model
     
     if client_to_use.test_connection():
         logger.info("Using Gemini to generate SQL query")
