@@ -135,7 +135,14 @@ class GeminiClient:
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                 }
             )
-            return response.text is not None and len(response.text) > 0
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    logger.info("Gemini connection test: PASSED")
+                    return True
+            logger.warning(f"Gemini blocked response. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
+            return False
+            
         except Exception as e:
             logger.warning(f"Gemini connection test failed: {e}")
             return False
