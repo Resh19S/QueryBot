@@ -66,7 +66,7 @@ class QueryResponse(BaseModel):
     ai_summary: Optional[str] = None  # Add AI summary field
 
 class GeminiSettings(BaseModel):
-    model: str = "gemini-1.5-flash-8b"
+    model: str = "gemini-2.5-flash"
     api_key: Optional[str] = None
     temperature: float = 0.0
     top_p: float = 0.9
@@ -94,7 +94,7 @@ else:
 
 # Gemini Client Class
 class GeminiClient:
-    def __init__(self, model="gemini-1.5-flash-8b", api_key=None):
+    def __init__(self, model="gemini-2.5-flash", api_key=None):
         self.model = model
         self.api_key = api_key or DEFAULT_API_KEY
         self.temperature = 0.0
@@ -154,7 +154,7 @@ class GeminiClient:
             return models
         except Exception as e:
             logger.warning(f"Failed to get available models: {e}")
-            return ["gemini-1.5-flash-8b", "gemini-1.5-pro", "gemini-pro"]
+            return ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro"]
     
     def update_api_key(self, api_key: str):
         """Update the API key and reconfigure client"""
@@ -206,7 +206,7 @@ class GeminiClient:
             return None
 
 # Initialize Gemini client
-gemini_client = GeminiClient(model="gemini-1.5-flash-8b")
+gemini_client = GeminiClient(model="gemini-2.5-flash")
 
 def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
     """Generate AI-powered analytical summary of query results"""
@@ -551,7 +551,7 @@ def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None)
     
     client_to_use = gemini_client
     if api_key:
-        client_to_use = GeminiClient(model="gemini-1.5-flash-8b", api_key=api_key)  # Specify model
+        client_to_use = GeminiClient(model="gemini-2.5-flash", api_key=api_key)  # Specify model
     
     if client_to_use.test_connection():
         logger.info("Using Gemini to generate SQL query")
