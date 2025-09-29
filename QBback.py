@@ -65,7 +65,7 @@ class QueryResponse(BaseModel):
     ai_summary: Optional[str] = None  # Add AI summary field
 
 class GeminiSettings(BaseModel):
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-1.5-flash-8b"
     api_key: Optional[str] = None
     temperature: float = 0.0
     top_p: float = 0.9
@@ -93,7 +93,7 @@ else:
 
 # Gemini Client Class
 class GeminiClient:
-    def __init__(self, model="gemini-2.5-flash", api_key=None):
+    def __init__(self, model="gemini-1.5-flash-8b", api_key=None):
         self.model = model
         self.api_key = api_key or DEFAULT_API_KEY
         self.temperature = 0.0
@@ -122,13 +122,19 @@ class GeminiClient:
                 return False
             
             response = self.client.generate_content(
-                "Say 'test' if you can read this.",
+                "what is 2+2.",
                 generation_config=genai.types.GenerationConfig(
                     temperature=0,
                     max_output_tokens=10
-                )
+                ),
+                safety_settings={
+                'HARASSMENT': 'block_none',
+                'HATE_SPEECH': 'block_none', 
+                'SEXUALLY_EXPLICIT': 'block_none',
+                'DANGEROUS_CONTENT': 'block_none'
+                }
             )
-            return response.text.strip().lower() == "test"
+            return response.text is not None and len(response.text) > 0
         except Exception as e:
             logger.warning(f"Gemini connection test failed: {e}")
             return False
@@ -147,7 +153,7 @@ class GeminiClient:
             return models
         except Exception as e:
             logger.warning(f"Failed to get available models: {e}")
-            return ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro"]
+            return ["gemini-1.5-flash-8b", "gemini-1.5-pro", "gemini-pro"]
     
     def update_api_key(self, api_key: str):
         """Update the API key and reconfigure client"""
@@ -172,10 +178,18 @@ class GeminiClient:
                 top_p=self.top_p,
                 max_output_tokens=1000,
             )
+
+            safety_settings = {
+            'HARASSMENT': 'block_none',
+            'HATE_SPEECH': 'block_none', 
+            'SEXUAL_CONTENT': 'block_none',
+            'DANGEROUS_CONTENT': 'block_none'
+            }
             
             response = self.client.generate_content(
                 full_prompt,
-                generation_config=generation_config
+                generation_config=generation_config,
+                safety_settings=safety_settings
             )
             
             if response.text:
@@ -191,7 +205,7 @@ class GeminiClient:
             return None
 
 # Initialize Gemini client
-gemini_client = GeminiClient(model="gemini-2.5-flash")
+gemini_client = GeminiClient(model="gemini-1.5-flash-8b")
 
 def generate_ai_summary(user_question, query_results, sql_query, api_key=None):
     """Generate AI-powered analytical summary of query results"""
@@ -536,7 +550,7 @@ def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None)
     
     client_to_use = gemini_client
     if api_key:
-        client_to_use = GeminiClient(model="gemini-2.5-flash", api_key=api_key)  # Specify model
+        client_to_use = GeminiClient(model="gemini-1.5-flash-8b", api_key=api_key)  # Specify model
     
     if client_to_use.test_connection():
         logger.info("Using Gemini to generate SQL query")
