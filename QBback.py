@@ -12,6 +12,7 @@ import logging
 import os
 import re
 from dotenv import load_dotenv  # Add this import
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -125,13 +126,13 @@ class GeminiClient:
                 "what is 2+2.",
                 generation_config=genai.types.GenerationConfig(
                     temperature=0,
-                    max_output_tokens=10
+                    max_output_tokens=20
                 ),
                 safety_settings={
-                'HARASSMENT': 'block_none',
-                'HATE_SPEECH': 'block_none', 
-                'SEXUALLY_EXPLICIT': 'block_none',
-                'DANGEROUS_CONTENT': 'block_none'
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                 }
             )
             return response.text is not None and len(response.text) > 0
@@ -180,10 +181,10 @@ class GeminiClient:
             )
 
             safety_settings = {
-            'HARASSMENT': 'block_none',
-            'HATE_SPEECH': 'block_none', 
-            'SEXUAL_CONTENT': 'block_none',
-            'DANGEROUS_CONTENT': 'block_none'
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
             
             response = self.client.generate_content(
