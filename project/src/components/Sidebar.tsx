@@ -175,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           Backend Server
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-400">
-                          https://querybot-production.up.https://querybot-1hxo.onrender.com.app
+                          https://querybot-1hxo.onrender.com
                         </div>
                       </div>
                     </div>
