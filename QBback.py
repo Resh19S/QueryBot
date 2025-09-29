@@ -552,88 +552,66 @@ def get_table_metadata(conn, table_name):
 
 
 def generate_sql_query_gemini(user_question, metadata, table_name, api_key=None):
-    """Generate SQL query using Gemini with fallback to pattern matching"""
+    """Generate SQL query using Gemini"""
     
-    columns = metadata['columns']
-    
-    client_to_use = gemini_client
-    if api_key:
-        client_to_use = GeminiClient(model="gemini-2.5-flash", api_key=api_key)  # Specify model
-    
-    if client_to_use.test_connection():
-        logger.info("Using Gemini to generate SQL query")
+    try:
+        # Configure with API key directly (like the working test)
+        api_to_use = api_key or DEFAULT_API_KEY
+        genai.configure(api_key=api_to_use)
+        
+        # Create model directly (like the working test)
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         columns_str = ", ".join([f"{col[0]} ({col[1]})" for col in metadata['column_types']])
         sample_str = str(metadata['sample_data'][:2]) if metadata['sample_data'] else "No sample data"
         numeric_cols = [col[0] for col in metadata['column_types'] if col[1].lower() in ['integer', 'real', 'numeric']]
         text_cols = [col[0] for col in metadata['column_types'] if col[1].lower() in ['text', 'varchar']]
         
-        system_prompt = """You are a SQL expert for data analysis.
-CORE RESPONSIBILITIES:
-- Convert natural language to precise SQLite queries
-- Prioritize business-relevant insights
-- Handle ambiguous requests intelligently
+        prompt = f"""You are a SQL expert. Generate a SQLite query.
 
-OUTPUT REQUIREMENTS:
-- Return ONLY the SQL query (no explanations, markdown, or code blocks)
-- Use proper SQLite syntax with backticks for column names containing spaces
-- Limit results to 100 rows unless specifically asking for totals/aggregations
+Table: {table_name}
+Columns: {columns_str}
+Sample data: {sample_str}
+Total rows: {metadata['total_rows']}
 
-QUERY OPTIMIZATION RULES:
-1. For "show me" requests: SELECT relevant columns with meaningful ORDER BY
-2. For "how many" requests: Use COUNT() with appropriate GROUP BY
-3. For "top/highest/best" requests: Use ORDER BY DESC with LIMIT
-4. For "average/total" requests: Use appropriate aggregation functions
-5. For date-related queries: Use proper date functions and formatting
+Numeric columns: {numeric_cols}
+Text columns: {text_cols}
 
-ERROR PREVENTION:
-- Always use backticks around column names with spaces or special characters
-- Use LIKE '%term%' for partial text matching
-- Handle potential NULL values appropriately
-- Use proper data type casting when needed"""
-        
-        prompt = f"""DATASET ANALYSIS:
-- Table name: {table_name}
-- Columns: {columns_str}
-- Sample data: {sample_str}
-- Total rows: {metadata['total_rows']}
+User request: {user_question}
 
 Rules:
-1. Return ONLY the SQL query, no explanations
-2. Use proper SQLite syntax
-3. Use backticks for column names with spaces
-4. For business insights, use appropriate aggregations
-5. Limit large result sets to 100 rows unless asking for totals
-
-COLUMN TYPES:
-- Numeric columns: {numeric_cols}
-- Text columns: {text_cols}
-
-User Question: {user_question}
+- Return ONLY the SQL query, no explanations
+- Use backticks for column names with spaces
+- Limit large result sets to 100 rows unless asking for totals
 
 SQL Query:"""
 
-        try:
-            sql_query = client_to_use.generate_response(prompt, system_prompt)
-            
-            if sql_query:
-                if sql_query.startswith('```'):
-                    lines = sql_query.split('\n')
-                    sql_query = '\n'.join(line for line in lines if not line.strip().startswith('```'))
-                
-                if sql_query.lower().startswith('sql'):
-                    sql_query = sql_query[3:].strip()
-                
-                sql_query = sql_query.strip().rstrip(';')
-                logger.info(f"Generated SQL query via Gemini: {sql_query}")
-                return sql_query
-            else:
-                logger.warning("Gemini returned empty response, falling back to pattern matching")
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0,
+                max_output_tokens=200
+            ),
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
         
-        except Exception as e:
-            logger.error(f"Error with Gemini SQL generation: {str(e)}")
-    else:
-        logger.info("Gemini not available, using pattern matching")
+        if response.text:
+            sql_query = response.text.strip()
+            # Clean markdown code blocks
+            sql_query = sql_query.replace('```sqlite', '').replace('```sql', '').replace('```', '').strip()
+            sql_query = sql_query.rstrip(';')
+            logger.info(f"Generated SQL query via Gemini: {sql_query}")
+            return sql_query
+        else:
+            logger.error("Gemini returned no text")
+            
+    except Exception as e:
+        logger.error(f"Error with Gemini SQL generation: {str(e)}")
     
 
 def execute_query(conn, sql_query):
