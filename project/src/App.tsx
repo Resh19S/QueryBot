@@ -8,7 +8,7 @@ import { QueryBox } from './components/QueryBox';
 import { AnswerDisplay } from './components/AnswerDisplay';
 
 // API Configuration
-const API_BASE_URL = 'https://querybot-production.up.railway.app'; // Your FastAPI server URL
+const API_BASE_URL = 'https://querybot-production.up.https://querybot-1hxo.onrender.com.app'; // Your FastAPI server URL
 
 interface QueryResult {
   success: boolean;
